@@ -1,0 +1,2393 @@
+%=========================================================
+%  Artificial Neural Networks and Deep Learning
+%  Notes: ML vs DL · Perceptrons · Feed Forward Neural Networks
+%=========================================================
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[top=2.4cm,bottom=2.4cm,left=2.2cm,right=2.2cm]{geometry}
+
+\usepackage[dvipsnames,svgnames,table]{xcolor}
+\definecolor{PrimaryBlue}{HTML}{1A4A7A}
+\definecolor{AccentBlue}{HTML}{2E86AB}
+\definecolor{LightBlue}{HTML}{E8F4F8}
+\definecolor{DefGreen}{HTML}{1A5C38}
+\definecolor{DefGreenBg}{HTML}{EAF6EE}
+\definecolor{ThmOrange}{HTML}{8B4000}
+\definecolor{ThmOrangeBg}{HTML}{FFF3E8}
+\definecolor{AlgoPurple}{HTML}{4A1A7A}
+\definecolor{AlgoPurpleBg}{HTML}{F2EAFF}
+\definecolor{WarningRed}{HTML}{7A1A1A}
+\definecolor{WarningRedBg}{HTML}{FFF0EE}
+\definecolor{NoteGray}{HTML}{4A4A4A}
+\definecolor{NoteGrayBg}{HTML}{F5F5F5}
+\definecolor{SectionColor}{HTML}{1A4A7A}
+\definecolor{SubsectionColor}{HTML}{2E6090}
+\definecolor{RuleColor}{HTML}{A0C4E0}
+
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{mathtools}
+\usepackage{enumitem}
+\setlist[itemize]{topsep=3pt,itemsep=2pt,leftmargin=1.8em}
+\setlist[enumerate]{topsep=3pt,itemsep=2pt,leftmargin=1.8em}
+\usepackage{booktabs,tabularx,array}
+
+\usepackage[most]{tcolorbox}
+\tcbuselibrary{breakable,skins}
+
+\newtcolorbox{defbox}[2][]{enhanced,breakable,
+  colback=DefGreenBg,colframe=DefGreen,fonttitle=\bfseries\color{white},title={#2},
+  attach boxed title to top left={yshift=-2mm,xshift=4mm},
+  boxed title style={colback=DefGreen,colframe=DefGreen,rounded corners,boxrule=0pt},
+  sharp corners=south,boxrule=0.8pt,left=6pt,right=6pt,top=10pt,bottom=6pt,#1}
+
+\newtcolorbox{thmbox}[2][]{enhanced,breakable,
+  colback=ThmOrangeBg,colframe=ThmOrange,fonttitle=\bfseries\color{white},title={#2},
+  attach boxed title to top left={yshift=-2mm,xshift=4mm},
+  boxed title style={colback=ThmOrange,colframe=ThmOrange,rounded corners,boxrule=0pt},
+  sharp corners=south,boxrule=0.8pt,left=6pt,right=6pt,top=10pt,bottom=6pt,#1}
+
+\newtcolorbox{algobox}[2][]{enhanced,breakable,
+  colback=AlgoPurpleBg,colframe=AlgoPurple,fonttitle=\bfseries\color{white},title={#2},
+  attach boxed title to top left={yshift=-2mm,xshift=4mm},
+  boxed title style={colback=AlgoPurple,colframe=AlgoPurple,rounded corners,boxrule=0pt},
+  sharp corners=south,boxrule=0.8pt,left=6pt,right=6pt,top=10pt,bottom=6pt,#1}
+
+\newtcolorbox{insightbox}[1][Key Insight]{enhanced,breakable,
+  colback=LightBlue,colframe=AccentBlue,fonttitle=\bfseries\color{white},title={#1},
+  attach boxed title to top left={yshift=-2mm,xshift=4mm},
+  boxed title style={colback=AccentBlue,colframe=AccentBlue,rounded corners,boxrule=0pt},
+  sharp corners=south,boxrule=0.8pt,left=6pt,right=6pt,top=10pt,bottom=6pt}
+
+\newtcolorbox{notebox}[1][Note]{enhanced,breakable,
+  colback=NoteGrayBg,colframe=NoteGray,fonttitle=\bfseries\color{white},title={#1},
+  attach boxed title to top left={yshift=-2mm,xshift=4mm},
+  boxed title style={colback=NoteGray,colframe=NoteGray,rounded corners,boxrule=0pt},
+  sharp corners=south,boxrule=0.8pt,left=6pt,right=6pt,top=10pt,bottom=6pt}
+
+\newtcolorbox{warnbox}[1][Important]{enhanced,breakable,
+  colback=WarningRedBg,colframe=WarningRed,fonttitle=\bfseries\color{white},title={#1},
+  attach boxed title to top left={yshift=-2mm,xshift=4mm},
+  boxed title style={colback=WarningRed,colframe=WarningRed,rounded corners,boxrule=0pt},
+  sharp corners=south,boxrule=0.8pt,left=6pt,right=6pt,top=10pt,bottom=6pt}
+
+\usepackage{listings}
+\usepackage{lstautogobble}
+% ---- Python listing style ----
+\lstdefinestyle{pythonstyle}{
+  language=Python,
+  basicstyle=\ttfamily\small,
+  keywordstyle=\color{PrimaryBlue}\bfseries,
+  stringstyle=\color{DefGreen},
+  commentstyle=\color{NoteGray}\itshape,
+  numberstyle=\tiny\color{NoteGray},
+  numbers=left,
+  stepnumber=1,
+  numbersep=8pt,
+  backgroundcolor=\color{NoteGrayBg},
+  frame=single,
+  framerule=0.6pt,
+  rulecolor=\color{RuleColor},
+  breaklines=true,
+  breakatwhitespace=false,
+  tabsize=4,
+  autogobble=true,
+  showstringspaces=false,
+  captionpos=b,
+  xleftmargin=12pt,
+  xrightmargin=4pt,
+  aboveskip=8pt,
+  belowskip=4pt,
+}
+\lstset{style=pythonstyle}
+\renewcommand{\lstlistingname}{Code}
+
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\algrenewcommand\algorithmicrequire{\textbf{Input:}}
+\algrenewcommand\algorithmicensure{\textbf{Output:}}
+
+\usepackage{titlesec}
+\titleformat{\section}{\color{SectionColor}\Large\bfseries}{\color{SectionColor}\thesection}{0.8em}{}
+  [\vspace{-0.3em}{\color{RuleColor}\hrule height 1.5pt}\vspace{0.4em}]
+\titleformat{\subsection}{\color{SubsectionColor}\normalsize\bfseries}{\thesubsection}{0.7em}{}
+\titleformat{\subsubsection}{\color{SubsectionColor}\normalsize\itshape\bfseries}{}{0em}{}
+
+\usepackage{fancyhdr}
+\pagestyle{fancy}\fancyhf{}
+\fancyhead[L]{\small\color{NoteGray}\textit{Artificial Neural Networks and Deep Learning}}
+\fancyhead[R]{\small\color{NoteGray}\nouppercase{\leftmark}}
+\fancyfoot[C]{\small\color{NoteGray}\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\headrule}{\color{RuleColor}\hrule width\headwidth height\headrulewidth}
+\setlength{\headheight}{14pt}
+
+\usepackage[colorlinks=true,linkcolor=PrimaryBlue,urlcolor=AccentBlue,
+            pdftitle={ANN and Deep Learning}]{hyperref}
+
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.5em}
+
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\term}[1]{\textcolor{DefGreen}{\textbf{#1}}}
+
+%=========================================================
+\begin{document}
+%=========================================================
+
+\begin{titlepage}
+\centering\vspace*{3cm}
+{\color{PrimaryBlue}\rule{\linewidth}{2pt}}\\[0.6em]
+{\Huge\bfseries\color{PrimaryBlue} Artificial Neural Networks}\\[0.3em]
+{\Huge\bfseries\color{PrimaryBlue} and Deep Learning}\\[0.4em]
+{\Large\color{SubsectionColor} Notes}\\[0.3em]
+{\color{PrimaryBlue}\rule{\linewidth}{2pt}}\vspace{1.5cm}
+\begin{tcolorbox}[colback=LightBlue,colframe=AccentBlue,width=0.85\textwidth,boxrule=1pt,arc=4pt]
+\centering\normalsize\color{NoteGray}
+Machine Learning vs Deep Learning $\cdot$ Biological \& Artificial Neurons\\
+Perceptron $\cdot$ Hebbian Learning $\cdot$ Boolean Operators $\cdot$ XOR Limitation\\
+Feed Forward Neural Networks $\cdot$ Activation Functions $\cdot$ Universal Approximation\\
+Optimization $\cdot$ Gradient Descent $\cdot$ Backpropagation $\cdot$ Chain Rule\\
+Maximum Likelihood Estimation $\cdot$ Loss Functions for Regression \& Classification
+\end{tcolorbox}
+\vfill{\color{NoteGray}\small For Study Use}
+\end{titlepage}
+
+\tableofcontents\newpage
+
+%=========================================================
+\section{Machine Learning and Deep Learning}
+%=========================================================
+
+\subsection{What is Machine Learning?}
+
+\term{Machine Learning} (ML) is a category of research and algorithms focused on finding patterns in data and using those patterns to make predictions. According to Tom Mitchell's classic 1997 definition: \emph{a computer program is said to learn from experience $E$ with respect to some class of task $T$ and performance measure $P$, if its performance at tasks in $T$, as measured by $P$, improves with experience $E$}. In concrete terms: $T$ is the task (regression, classification, \ldots), $E$ is the data, and $P$ is a loss or error measure.
+
+ML falls within the broader artificial intelligence umbrella, intersecting with statistics, pattern recognition, databases, and knowledge discovery.
+
+\subsection{Machine Learning Paradigms}
+
+Given a dataset $D = \{x_1, x_2, \ldots, x_N\}$, there are three main paradigms depending on what information is available alongside the inputs.
+
+\term{Supervised learning} is the paradigm studied most in this course. Alongside the inputs we are given desired outputs $t_1, t_2, \ldots, t_N$, and the goal is to learn a mapping that generalises correctly to new inputs. The two main flavours are \emph{regression}, where the target is a continuous value, and \emph{classification}, where the target is a discrete class label.
+
+\term{Unsupervised learning} receives only the raw data $D$ with no labels. The goal is to exploit regularities in the data to build a useful representation — for example, grouping similar examples together via \emph{clustering}.
+
+\term{Reinforcement learning} involves an agent that produces actions $a_1, \ldots, a_N$ which affect an environment, and in return receives scalar rewards $r_1, \ldots, r_N$. The agent learns to act so as to maximise cumulative reward over time.
+
+\subsection{The Limitation of Hand-crafted Features and the Rise of Deep Learning}
+
+Classical ML follows a two-stage pipeline: first a human expert \emph{hand-crafts features} from raw data (e.g.\ SIFT/HoG for images, MFCC for audio), then a learned classifier or regressor operates on those features. This approach has two fundamental problems. First, if the chosen features do not capture the discriminative structure of the data, even the best classifier cannot succeed — in the worst case the classes are entirely inseparable in feature space. Second, designing good features requires deep domain expertise and is time-consuming.
+
+\term{Deep Learning} replaces hand-crafted features with \emph{learned features}: a hierarchy of representations is learned directly from raw data, optimised end-to-end for the task at hand. Each layer extracts increasingly abstract representations, and because the entire pipeline is trained jointly, the features are guaranteed to be useful for the final objective. Deep Learning is therefore best summarised as \emph{learning data representations from data}.
+
+\begin{insightbox}[ML vs Deep Learning: the key distinction]
+In classical ML the \emph{features are fixed} and only the classifier is learned. In Deep Learning \emph{both the features and the classifier are learned jointly}, end-to-end. This is what makes deep models so powerful on raw perceptual data (images, audio, text) where good features are hard to specify by hand.
+\end{insightbox}
+
+The practical explosion of Deep Learning from 2012 onwards was enabled by two factors: the availability of \emph{large labelled datasets} (Big Data) and \emph{massive computational power} (GPU acceleration).
+
+%=========================================================
+\section{From Biological to Artificial Neurons}
+%=========================================================
+
+\subsection{The Brain as Inspiration}
+
+In the 1940s, researchers were looking for a computational model beyond the sequential von Neumann architecture. Computers of the time were excellent at executing precise programs and fast arithmetic, but they could not interact robustly with noisy environments, were not fault-tolerant, and could not adapt. The human brain offered an inspiring alternative: roughly $10^{11}$ neurons, each connected to about $7{,}000$ others via synapses, forming a massively parallel, distributed, and fault-tolerant system. These properties motivated the idea of building \emph{artificial} neural networks.
+
+\subsection{Biological Neuron Operation}
+
+A biological neuron receives electrochemical signals through its \term{dendrites}. These signals are either \emph{excitatory} (increasing the membrane potential) or \emph{inhibitory} (decreasing it). The signals accumulate in the \term{cell body} (soma). When the cumulative potential exceeds a \term{threshold} at the \term{axon hillock}, the neuron \emph{fires}: it emits an electrical spike that travels down the \term{axon} and is transmitted to other neurons via \term{synaptic terminals}, where \emph{neurotransmitters} are released across the synapse to the dendrites of the next neuron.
+
+\subsection{The Artificial Neuron}
+
+The artificial neuron mimics this mechanism mathematically. It receives $I$ inputs $x_1, \ldots, x_I$, each multiplied by a learned \term{weight} $w_i$ (positive weights are excitatory, negative weights are inhibitory). The weighted sum is compared against a \term{bias} $b$ (which plays the role of the firing threshold), and the result is passed through a nonlinear \term{activation function} $h_j$:
+
+\begin{defbox}{Artificial Neuron}
+\[
+h_j(\mathbf{x} \mid \mathbf{w}, b) = h_j\!\left(\sum_{i=1}^{I} w_i \cdot x_i - b\right)
+= h_j\!\left(\sum_{i=0}^{I} w_i \cdot x_i\right) = h_j(\mathbf{w}^T \mathbf{x})
+\]
+where the bias is absorbed as an extra weight $w_0 = -b$ with a fixed input $x_0 = 1$.
+\end{defbox}
+
+The bias shift trick ($x_0 = 1,\; w_0 = -b$) is standard and simplifies notation: the neuron's full computation is just $h_j(\mathbf{w}^T\mathbf{x})$ with an augmented weight vector.
+
+%=========================================================
+\section{The Perceptron}
+%=========================================================
+
+\subsection{Historical Background}
+
+Three milestones mark the early history of artificial neurons:
+\begin{itemize}
+  \item \textbf{1943 — McCulloch \& Pitts:} proposed the first formal neuron model, the \term{Threshold Logic Unit}. The activation function was the Heaviside step function: the neuron outputs 1 if its weighted input exceeds the threshold, 0 otherwise.
+  \item \textbf{1957 — Frank Rosenblatt:} built the first \term{Perceptron} in hardware (the Mark~I Perceptron). Weights were encoded in potentiometers and updated by electric motors during learning.
+  \item \textbf{1960 — Bernard Widrow:} introduced the \term{ADALINE} (Adaptive Linear Neuron / Element), and the idea of representing the threshold as a learnable bias term $w_0$ — the convention still used today.
+\end{itemize}
+
+\subsection{Perceptron as a Linear Classifier}
+
+The perceptron computes a weighted sum of its inputs (with bias absorbed) and applies the sign function:
+
+\begin{defbox}{Perceptron Output}
+\[
+h_j(\mathbf{x} \mid \mathbf{w}) = \mathrm{Sign}\!\left(\sum_{i=0}^{I} w_i \cdot x_i\right)
+= \mathrm{Sign}(w_0 + w_1 x_1 + \cdots + w_I x_I)
+\]
+\[
+\mathrm{Sign}(z) = \begin{cases} +1 & \text{if } z > 0 \\ 0 & \text{if } z = 0 \\ -1 & \text{if } z < 0 \end{cases}
+\]
+\end{defbox}
+
+The perceptron is a \term{linear classifier}: its decision boundary is the hyperplane
+\[
+w_0 + w_1 x_1 + \cdots + w_I x_I = 0.
+\]
+In two dimensions this reduces to a line. Solving for $x_2$:
+\[
+x_2 = -\frac{w_0}{w_2} - \frac{w_1}{w_2} x_1,
+\]
+which is just a straight line with slope $-w_1/w_2$ and intercept $-w_0/w_2$. The weight vector $\mathbf{w}$ is normal to this line, and the quantity $w_0 + \mathbf{w}^T\mathbf{x}$ is proportional to the \emph{signed distance} of a point $\mathbf{x}$ from the boundary (see Section~\ref{sec:hyperplane}).
+
+\subsection{Perceptron as Logical Operator}
+
+A perceptron with two binary inputs $x_1, x_2 \in \{0,1\}$ can implement Boolean functions.
+
+\textbf{Logical OR} ($w_0 = -\tfrac{1}{2},\; w_1 = w_2 = 1$):
+\[
+h_{\mathrm{OR}}(x_1, x_2) = \begin{cases} 1 & \text{if } -\tfrac{1}{2} + x_1 + x_2 > 0 \\ 0 & \text{otherwise} \end{cases}
+\]
+
+\textbf{Logical AND} ($w_0 = -2,\; w_1 = \tfrac{3}{2},\; w_2 = 1$):
+\[
+h_{\mathrm{AND}}(x_1, x_2) = \begin{cases} 1 & \text{if } -2 + \tfrac{3}{2}x_1 + x_2 > 0 \\ 0 & \text{otherwise} \end{cases}
+\]
+
+The weights are not unique: any set of weights that places the decision boundary correctly will work. The important point is that the perceptron is \emph{single trainable hardware} that implements any linearly separable Boolean function without being re-programmed.
+
+\subsection{Hyperplane Geometry and Signed Distance}
+\label{sec:hyperplane}
+
+Understanding the geometry of the decision boundary is important for understanding both the perceptron's classification rule and its learning algorithm.
+
+\begin{thmbox}{Hyperplane Geometry}
+Let $L: w_0 + \mathbf{w}^T\mathbf{x} = 0$ be a hyperplane in $\mathbb{R}^n$. Then:
+\begin{itemize}
+  \item For any two points $\mathbf{x}_1, \mathbf{x}_2$ on $L$: $\mathbf{w}^T(\mathbf{x}_1 - \mathbf{x}_2) = 0$, so $\mathbf{w}$ is \emph{normal} to $L$.
+  \item The unit normal is $\mathbf{w}^* = \mathbf{w}/\|\mathbf{w}\|$.
+  \item For any point $\mathbf{x}_0$ on $L$: $\mathbf{w}^T\mathbf{x}_0 = -w_0$.
+  \item The \term{signed distance} of any point $\mathbf{x}$ from $L$ is:
+  \[
+  {\mathbf{w}^*}^T(\mathbf{x} - \mathbf{x}_0) = \frac{1}{\|\mathbf{w}\|}(w_0 + \mathbf{w}^T\mathbf{x})
+  \]
+\end{itemize}
+\end{thmbox}
+
+The key insight is that the perceptron's net input $(w_0 + \mathbf{w}^T\mathbf{x})$ is directly proportional to the signed distance of $\mathbf{x}$ from the decision boundary. Points on the positive side have a positive net input, points on the negative side have a negative net input, and points exactly on the boundary have zero net input. The sign function applied to this quantity is therefore exactly the classification rule.
+
+\subsection{Hebbian Learning}
+
+Donald Hebb (1949) proposed the synaptic learning rule: \emph{the strength of a synapse increases according to the simultaneous activation of the relative input and the desired target}. Formally, weights are updated online (one sample at a time) starting from a random initialisation, and only when a sample is misclassified:
+
+\begin{defbox}{Hebbian (Perceptron) Learning Rule}
+\[
+w_i^{k+1} = w_i^k + \Delta w_i^k, \qquad \Delta w_i^k = \eta \cdot x_i^k \cdot t^k
+\]
+where $\eta > 0$ is the \term{learning rate}, $x_i^k$ is the $i$-th input at step $k$, and $t^k \in \{-1, +1\}$ is the desired output.
+\end{defbox}
+
+\begin{notebox}[Practical notes on Hebbian learning]
+The algorithm starts from random weights, cycles through the training set, and fixes one misclassified example at a time. It terminates when all examples are classified correctly. Two important questions arise: (1) \emph{Does it always converge?} — Yes, if the data is linearly separable (Perceptron Convergence Theorem). (2) \emph{Does it always converge to the same weights?} — No; the solution depends on the initialisation and the order in which examples are presented.
+\end{notebox}
+
+\subsection{Perceptron Learning as Stochastic Gradient Descent}
+\label{sec:percSGD}
+
+It is instructive to understand \emph{what objective function} Hebbian learning is minimising, because this establishes the connection to gradient-based optimisation that will be central throughout the course.
+
+Using the $+1/-1$ output coding, a misclassified point satisfies $t_i(\mathbf{w}^T\mathbf{x}_i + w_0) < 0$ (the net input has the wrong sign). The \term{perceptron criterion} is defined as the total (negative) signed distance of all misclassified points from the decision boundary:
+\[
+D(\mathbf{w}, w_0) = -\sum_{i \in \mathcal{M}} t_i\,(\mathbf{w}^T\mathbf{x}_i + w_0)
+\]
+where $\mathcal{M}$ is the set of currently misclassified points. This is non-negative (each term in the sum is negative, and the overall sign is flipped) and equals zero only when $\mathcal{M}$ is empty, i.e., when all points are correctly classified.
+
+The gradients of $D$ with respect to the model parameters are:
+\[
+\frac{\partial D}{\partial \mathbf{w}} = -\sum_{i \in \mathcal{M}} t_i \mathbf{x}_i, \qquad
+\frac{\partial D}{\partial w_0} = -\sum_{i \in \mathcal{M}} t_i.
+\]
+Applying stochastic gradient descent on a single misclassified point $(i \in \mathcal{M})$:
+\[
+\begin{pmatrix} \mathbf{w}^{k+1} \\ w_0^{k+1} \end{pmatrix}
+= \begin{pmatrix} \mathbf{w}^k \\ w_0^k \end{pmatrix}
++ \eta \begin{pmatrix} t_i \mathbf{x}_i \\ t_i \end{pmatrix}
+= \begin{pmatrix} \mathbf{w}^k \\ w_0^k \end{pmatrix}
++ \eta \begin{pmatrix} t_i \mathbf{x}_i \\ t_i x_0 \end{pmatrix}
+\]
+This is precisely the Hebbian update rule. Therefore:
+
+\begin{insightbox}[Hebbian learning = SGD on the perceptron criterion]
+The Hebbian learning rule is not a heuristic — it is exactly Stochastic Gradient Descent applied to the perceptron criterion $D(\mathbf{w}, w_0)$, which measures the total distance of misclassified points from the decision boundary. Only misclassified points contribute to the gradient, which is why the rule only updates when a sample is wrong.
+\end{insightbox}
+
+\subsection{What the Perceptron Cannot Do: the XOR Problem}
+
+The perceptron is limited to \emph{linearly separable} problems. The canonical counterexample is the XOR function: no single straight line can separate the $(-1,-1,-1)$, $(-1,+1,+1)$, $(+1,-1,+1)$, $(+1,+1,-1)$ pattern. Minsky and Papert formalised this limitation in their 1969 book \emph{Perceptrons}.
+
+More generally, the capabilities of a network depend on its topology:
+\begin{itemize}
+  \item \textbf{Single layer (perceptron):} can only form half-spaces bounded by hyperplanes. Cannot solve XOR.
+  \item \textbf{Two layers:} can form convex open or closed regions. Can solve XOR.
+  \item \textbf{Three or more layers:} can form arbitrary regions (complexity limited by number of nodes). Can solve any classification problem given enough neurons.
+\end{itemize}
+
+Unfortunately, the Hebbian learning rule does not extend to multilayer networks — it only applies to the output layer where the target is known. For hidden layers there are no direct targets, so a different learning algorithm is needed. This motivates the development of backpropagation.
+
+%=========================================================
+\section{Feed Forward Neural Networks}
+%=========================================================
+
+\subsection{Architecture}
+
+A \term{Feed Forward Neural Network} (FFNN), also called a \term{Multi-Layer Perceptron} (MLP), extends the single perceptron to a deep, layered architecture. Information flows in one direction only: from inputs to outputs.
+
+\begin{defbox}{Feed Forward Neural Network}
+A FFNN consists of:
+\begin{itemize}
+  \item An \textbf{input layer} with $I$ neurons (one per input feature, plus a bias unit).
+  \item One or more \textbf{hidden layers} with $J_1, J_2, \ldots$ neurons each.
+  \item An \textbf{output layer} with $K$ neurons.
+\end{itemize}
+Layers are connected by weight matrices $W^{(l)} = \{w_{ji}^{(l)}\}$, where $w_{ji}^{(l)}$ is the weight from neuron $i$ in layer $l-1$ to neuron $j$ in layer $l$. The output of layer $l$ depends only on the previous layer:
+\[
+h^{(l)} = \bigl\{h_j^{(l)}(h^{(l-1)}, W^{(l)})\bigr\}
+\]
+\end{defbox}
+
+A FFNN is a \emph{non-linear} parametric model characterised entirely by: the number and sizes of layers, the choice of activation functions, and the values of the weights. Crucially, activation functions must be \emph{differentiable} to allow gradient-based training (backpropagation).
+
+\subsection{Activation Functions}
+
+The choice of activation function determines the expressiveness of each neuron and the behaviour of gradients during training. Three classical choices are:
+
+\begin{tcolorbox}[colback=LightBlue,colframe=AccentBlue,boxrule=0.8pt,arc=3pt]
+\textbf{Activation Functions}\\[6pt]
+\begin{tabular}{@{}llll@{}}
+\toprule
+\textbf{Name} & \textbf{Formula} & \textbf{Derivative} & \textbf{Range} \\
+\midrule
+Linear & $g(a) = a$ & $g'(a) = 1$ & $(-\infty, +\infty)$ \\
+Sigmoid & $g(a) = \dfrac{1}{1+e^{-a}}$ & $g'(a) = g(a)(1-g(a))$ & $(0, 1)$ \\
+Tanh & $g(a) = \dfrac{e^a - e^{-a}}{e^a + e^{-a}}$ & $g'(a) = 1 - g(a)^2$ & $(-1, 1)$ \\
+\bottomrule
+\end{tabular}
+\end{tcolorbox}
+
+The \term{sigmoid} and \term{tanh} are S-shaped (\emph{squashing} functions): they map any real number to a bounded range. Both are smooth and differentiable everywhere. A useful property of the sigmoid is that its derivative can be expressed in terms of the function itself: $g'(a) = g(a)(1-g(a))$, which makes it cheap to compute during backpropagation.
+
+\begin{notebox}[Sigmoid vs Tanh]
+Tanh is a rescaled and shifted version of sigmoid: $\tanh(a) = 2\,\sigma(2a) - 1$. Tanh is zero-centred (its outputs range from $-1$ to $+1$), which in practice leads to better-behaved gradients in hidden layers. Sigmoid is preferred at the output layer for binary classification because its output can be interpreted as a probability.
+\end{notebox}
+
+\subsection{Output Layer Design}
+
+The output layer activation depends on the task:
+
+\begin{itemize}
+  \item \textbf{Regression:} the output spans all of $\mathbb{R}$, so use a \emph{linear} activation. The network directly predicts a real-valued quantity.
+  \item \textbf{Binary classification ($\{0,1\}$ coding):} use a \emph{sigmoid} output. The output can be interpreted as the posterior probability $p(t=1 \mid \mathbf{x})$.
+  \item \textbf{Binary classification ($\{-1,+1\}$ coding):} use a \emph{tanh} output.
+  \item \textbf{Multi-class classification ($K$ classes):} use one output neuron per class with classes encoded as \term{one-hot vectors} (e.g.\ $\Omega_0 = [0,0,1],\; \Omega_1 = [0,1,0],\; \Omega_2 = [1,0,0]$). Apply the \term{softmax} activation:
+\end{itemize}
+
+\begin{defbox}{Softmax Activation (Multi-class Output)}
+\[
+y_k = \frac{\exp(z_k)}{\sum_{k'=1}^{K} \exp(z_{k'})},
+\qquad z_k = \sum_j w_{kj}\, h_j\!\left(\sum_i w_{ji}^{(1)} x_i\right)
+\]
+The softmax guarantees that outputs are non-negative and sum to 1, making them interpretable as a probability distribution over classes.
+\end{defbox}
+
+\begin{warnbox}[Activation function rule of thumb]
+For \emph{hidden layers}: always use sigmoid or tanh (or ReLU in modern networks). For \emph{output layers}: match the activation to the coding and task — linear for regression, sigmoid for binary $\{0,1\}$, tanh for binary $\{-1,+1\}$, softmax for multi-class.
+\end{warnbox}
+
+\subsection{Universal Approximation Theorem}
+
+\begin{thmbox}{Universal Approximation Theorem (Hornik, 1991)}
+A single hidden layer feedforward neural network with sigmoid (S-shaped) activation functions can approximate any measurable function to any desired degree of accuracy on a compact set.
+\end{thmbox}
+
+This theorem is theoretically reassuring: one hidden layer is always sufficient in principle. However, it comes with important practical caveats:
+\begin{itemize}
+  \item It guarantees \emph{existence}, not that a learning algorithm will \emph{find} the required weights.
+  \item In the worst case, an exponential number of hidden units may be required.
+  \item A single very wide layer may fail to generalise well. In practice, \emph{deep} networks with multiple moderate-width layers tend to learn more efficiently and generalise better.
+\end{itemize}
+
+%=========================================================
+\section{Optimisation and Learning}
+%=========================================================
+
+\subsection{The Supervised Learning Objective}
+
+Given a training set $\mathcal{D} = \{(\mathbf{x}_1, t_1), \ldots, (\mathbf{x}_N, t_N)\}$, we want to find weights $\mathbf{w}$ such that the network output $g(\mathbf{x}_n \mid \mathbf{w})$ approximates the target $t_n$ for new, unseen data. This is formalised as minimising an \term{error function} (also called a \term{loss function}) $E(\mathbf{w})$ over the training set.
+
+\subsection{Non-Linear Optimisation and Gradient Descent}
+
+The ideal approach would be to set the gradient to zero and solve analytically:
+\[
+\frac{\partial E(\mathbf{w})}{\partial \mathbf{w}} = 0.
+\]
+However, because $g(\mathbf{x} \mid \mathbf{w})$ is a nonlinear function of $\mathbf{w}$ (due to the nonlinear activations), this system of equations has no closed-form solution in general. The standard approach is iterative \term{gradient descent}:
+
+\begin{defbox}{Gradient Descent Update}
+\[
+\mathbf{w}^{k+1} = \mathbf{w}^k - \eta \left.\frac{\partial E(\mathbf{w})}{\partial \mathbf{w}}\right|_{\mathbf{w}^k}
+\]
+where $\eta > 0$ is the \term{learning rate}. Starting from a random initialisation, this procedure iteratively moves the weights in the direction of steepest descent of $E$.
+\end{defbox}
+
+Because the error surface of a neural network is non-convex and has many local minima, gradient descent may get stuck. A common mitigation is \term{momentum}: add a fraction $\alpha$ of the previous gradient step to the current one:
+\[
+\mathbf{w}^{k+1} = \mathbf{w}^k - \eta \left.\frac{\partial E}{\partial \mathbf{w}}\right|_{\mathbf{w}^k} - \alpha \left.\frac{\partial E}{\partial \mathbf{w}}\right|_{\mathbf{w}^{k-1}}
+\]
+Momentum gives the update inertia: it helps the optimiser continue through small local minima and speeds up progress along flat directions. Another practical strategy is to run optimisation from \emph{multiple random restarts} and keep the solution with lowest training error.
+
+\subsection{Gradient Descent Variants}
+
+Computing the full gradient over the entire dataset at each step (\term{batch gradient descent}) is often computationally prohibitive for large $N$. Three variants trade off accuracy against cost:
+
+\begin{tcolorbox}[colback=LightBlue,colframe=AccentBlue,boxrule=0.8pt,arc=3pt]
+\textbf{Gradient Descent Variants}\\[6pt]
+\begin{tabular}{@{}llll@{}}
+\toprule
+\textbf{Variant} & \textbf{Gradient estimate} & \textbf{Bias} & \textbf{Variance} \\
+\midrule
+Batch GD & $\frac{1}{N}\sum_{n=1}^N \frac{\partial E(\mathbf{x}_n,\mathbf{w})}{\partial \mathbf{w}}$ & Unbiased & Low \\
+SGD & $\frac{\partial E(\mathbf{x}_n,\mathbf{w})}{\partial \mathbf{w}}$ (one sample) & Unbiased & High \\
+Mini-batch GD & $\frac{1}{M}\sum_{n \in \text{mini-batch}} \frac{\partial E(\mathbf{x}_n,\mathbf{w})}{\partial \mathbf{w}}$ & Unbiased & Medium \\
+\bottomrule
+\end{tabular}\\[6pt]
+Mini-batch gradient descent ($M \ll N$) is the standard choice in practice: it provides a good trade-off between variance and computational cost, and enables hardware parallelism.
+\end{tcolorbox}
+
+\begin{insightbox}[Why SGD works despite noisy gradients]
+Each SGD step uses only a single sample, so the gradient estimate is noisy. However, this noise is actually beneficial: it acts as a form of regularisation, helping the optimiser escape sharp local minima. In practice, mini-batch SGD is preferred because it reduces variance while retaining computational efficiency.
+\end{insightbox}
+
+\subsection{Backpropagation and the Chain Rule}
+
+Computing $\partial E / \partial w_{ji}^{(l)}$ for every weight in the network by hand would be intractable. \term{Backpropagation} is an efficient algorithm that computes all these gradients in a single backward pass through the network, exploiting the \term{chain rule} of calculus.
+
+The chain rule states: if $z = f(g(x)) = f(y)$ with $y = g(x)$, then
+\[
+\frac{dz}{dx} = \frac{dz}{dy}\frac{dy}{dx} = f'(y)\,g'(x) = f'(g(x))\,g'(x).
+\]
+Applied to a two-layer network with one output, the gradient of the error with respect to a first-layer weight $w_{ji}^{(1)}$ decomposes as:
+\[
+\frac{\partial E}{\partial w_{ji}^{(1)}} = \underbrace{\frac{\partial E}{\partial g}}_{\text{output error}} \cdot \underbrace{\frac{\partial g}{\partial w_{1j}^{(2)} h_j(\cdot)}}_{\text{output layer}} \cdot \underbrace{\frac{\partial w_{1j}^{(2)} h_j(\cdot)}{\partial h_j(\cdot)}}_{\text{weight}} \cdot \underbrace{\frac{\partial h_j(\cdot)}{\partial w_{ji}^{(1)} x_i}}_{\text{hidden layer}} \cdot \underbrace{\frac{\partial w_{ji}^{(1)} x_i}{\partial w_{ji}^{(1)}}}_{\;= x_i}
+\]
+
+Concretely, for the two-layer network $g_1(\mathbf{x}_n \mid \mathbf{w}) = g_1\!\left(\sum_{j=0}^J w_{1j}^{(2)} h_j\!\left(\sum_{i=0}^I w_{ji}^{(1)} x_{i,n}\right)\right)$:
+
+\begin{thmbox}{Gradient for First-Layer Weight (two-layer network)}
+\[
+\frac{\partial E(w_{ji}^{(1)})}{\partial w_{ji}^{(1)}} = -2\sum_{n=1}^N
+\underbrace{(t_n - g_1(\mathbf{x}_n, \mathbf{w}))}_{\text{residual}} \cdot
+\underbrace{g_1'(\mathbf{x}_n, \mathbf{w})}_{\text{output activation'}} \cdot
+\underbrace{w_{1j}^{(2)}}_{\text{next-layer weight}} \cdot
+\underbrace{h_j'\!\left(\sum_{i=0}^I w_{ji}^{(1)} x_{i,n}\right)}_{\text{hidden activation'}} \cdot
+\underbrace{x_i}_{\text{input}}
+\]
+\end{thmbox}
+
+The structure of this expression reveals how backpropagation works: each factor corresponds to one link in the chain rule, and the same intermediate quantities computed in the \emph{forward pass} (the activations $h_j$ and $g_1$) are reused in the \emph{backward pass} (to compute the derivatives $h_j'$ and $g_1'$). The algorithm thus requires exactly two passes — one forward and one backward — regardless of the number of layers.
+
+\begin{algobox}{Backpropagation: Two-Pass Structure}
+\textbf{Forward pass:} compute all activations $h^{(1)}, h^{(2)}, \ldots, g$ from inputs to output. Store all intermediate values.\par\medskip
+\textbf{Backward pass:} compute error at output. Propagate error signal layer by layer from output to input, accumulating the gradient contribution for each weight using the chain rule. Update weights with gradient descent.
+\end{algobox}
+
+\begin{insightbox}[Why backpropagation is efficient]
+A naïve implementation that differentiates $E$ with respect to each weight independently would recompute the same intermediate derivatives many times. Backpropagation avoids this by computing and reusing the \emph{error signal} (also called $\delta$) at each neuron, which accumulates all the information flowing back from the output. The total computational cost is only a constant multiple of the forward pass cost.
+\end{insightbox}
+
+%=========================================================
+\section{Maximum Likelihood Estimation and Loss Functions}
+%=========================================================
+
+\subsection{Maximum Likelihood Estimation: Motivation and Recipe}
+
+\term{Maximum Likelihood Estimation} (MLE) provides a principled statistical framework for choosing a loss function. Rather than minimising an ad hoc error, we ask: \emph{what model parameters make the observed data most probable?}
+
+\begin{defbox}{MLE Recipe}
+Given a parameter vector $\boldsymbol{\theta} = (\theta_1, \ldots, \theta_p)^T$, find the MLE for $\boldsymbol{\theta}$:
+\begin{enumerate}
+  \item Write the \textbf{likelihood} $L = P(\text{Data} \mid \boldsymbol{\theta})$ — the probability of the data under the model.
+  \item Take the \textbf{log-likelihood} $\ell = \log P(\text{Data} \mid \boldsymbol{\theta})$ (the $\log$ converts products to sums and does not change the argmax).
+  \item Compute $\partial \ell / \partial \boldsymbol{\theta}$ and solve $\partial \ell / \partial \theta_i = 0$ analytically, or use gradient ascent numerically.
+\end{enumerate}
+\end{defbox}
+
+The log is a monotone transformation, so maximising $\ell$ is equivalent to maximising $L$. Working with the log is much more convenient because the joint likelihood of i.i.d.\ samples is a product, and $\log$ turns products into sums.
+
+\subsection{Warm-up: MLE for a Gaussian (Derivation)}
+
+Suppose we observe i.i.d.\ samples $x_1, \ldots, x_N \sim \mathcal{N}(\mu, \sigma^2)$ with $\sigma^2$ known. We want to find the MLE for $\mu$.
+
+\textbf{Step 1 — Likelihood:}
+\[
+L(\mu) = \prod_{n=1}^N p(x_n \mid \mu, \sigma^2) = \prod_{n=1}^N \frac{1}{\sqrt{2\pi}\,\sigma} \exp\!\left(-\frac{(x_n-\mu)^2}{2\sigma^2}\right)
+\]
+
+\textbf{Step 2 — Log-likelihood:}
+\[
+\ell(\mu) = \sum_{n=1}^N \log \frac{1}{\sqrt{2\pi}\,\sigma} \exp\!\left(-\frac{(x_n-\mu)^2}{2\sigma^2}\right)
+= N \log\frac{1}{\sqrt{2\pi}\,\sigma} - \frac{1}{2\sigma^2}\sum_{n=1}^N (x_n - \mu)^2
+\]
+
+\textbf{Step 3 — Gradient:}
+\[
+\frac{\partial \ell(\mu)}{\partial \mu} = -\frac{1}{2\sigma^2}\frac{\partial}{\partial \mu}\sum_n(x_n - \mu)^2 = \frac{1}{2\sigma^2}\sum_n 2(x_n - \mu) = \frac{1}{\sigma^2}\sum_n (x_n - \mu)
+\]
+
+\textbf{Step 4 — Solve:}
+\[
+\frac{\partial \ell}{\partial \mu} = 0 \;\Rightarrow\; \sum_n (x_n - \mu) = 0 \;\Rightarrow\; \mu^{\mathrm{MLE}} = \frac{1}{N}\sum_{n=1}^N x_n
+\]
+
+The MLE for the mean of a Gaussian is just the sample mean. This result will motivate the squared error loss for neural network regression.
+
+\subsection{MLE for Neural Network Regression: Sum of Squared Errors}
+
+\textbf{Model assumption:} the target $t_n$ is generated as
+\[
+t_n = g(\mathbf{x}_n \mid \mathbf{w}) + \epsilon_n, \qquad \epsilon_n \sim \mathcal{N}(0, \sigma^2),
+\]
+which implies $t_n \sim \mathcal{N}(g(\mathbf{x}_n \mid \mathbf{w}),\, \sigma^2)$. The network $g(\cdot \mid \mathbf{w})$ models the conditional mean of $t$ given $\mathbf{x}$.
+
+\textbf{Step 1 — Likelihood:}
+\[
+L(\mathbf{w}) = \prod_{n=1}^N p(t_n \mid g(\mathbf{x}_n \mid \mathbf{w}), \sigma^2)
+= \prod_{n=1}^N \frac{1}{\sqrt{2\pi}\,\sigma}\exp\!\left(-\frac{(t_n - g(\mathbf{x}_n \mid \mathbf{w}))^2}{2\sigma^2}\right)
+\]
+
+\textbf{Step 2 — Log-likelihood:}
+\[
+\ell(\mathbf{w}) = \sum_n \log\frac{1}{\sqrt{2\pi}\,\sigma} - \frac{1}{2\sigma^2}\sum_n (t_n - g(\mathbf{x}_n \mid \mathbf{w}))^2
+\]
+
+\textbf{Step 3 — Maximise:}
+\[
+\underset{\mathbf{w}}{\arg\max}\;\ell(\mathbf{w}) = \underset{\mathbf{w}}{\arg\max}\;{-\frac{1}{2\sigma^2}\sum_n (t_n - g(\mathbf{x}_n \mid \mathbf{w}))^2}
+= \underbrace{\underset{\mathbf{w}}{\arg\min}\;\sum_n (t_n - g(\mathbf{x}_n \mid \mathbf{w}))^2}_{\text{Sum of Squared Errors}}
+\]
+
+\begin{insightbox}[SSE loss = MLE under Gaussian noise assumption]
+Minimising the Sum of Squared Errors is \emph{exactly equivalent} to Maximum Likelihood Estimation when we assume that the targets are generated by the network plus Gaussian i.i.d.\ noise. This gives the SSE a solid statistical justification: it is not arbitrary, but the unique loss that is optimal under this noise model.
+\end{insightbox}
+
+\subsection{MLE for Neural Network Classification: Cross-Entropy}
+
+For binary classification the output $g(\mathbf{x}_n \mid \mathbf{w})$ represents the probability of class 1: $g(\mathbf{x}_n \mid \mathbf{w}) = p(t_n = 1 \mid \mathbf{x}_n)$. With targets $t_n \in \{0,1\}$, the label follows a Bernoulli distribution:
+\[
+t_n \sim \mathrm{Be}(g(\mathbf{x}_n \mid \mathbf{w})), \qquad
+p(t \mid g(\mathbf{x} \mid \mathbf{w})) = g(\mathbf{x} \mid \mathbf{w})^t \cdot (1 - g(\mathbf{x} \mid \mathbf{w}))^{1-t}
+\]
+
+\textbf{Step 1 — Likelihood:}
+\[
+L(\mathbf{w}) = \prod_{n=1}^N g(\mathbf{x}_n \mid \mathbf{w})^{t_n} \cdot (1 - g(\mathbf{x}_n \mid \mathbf{w}))^{1-t_n}
+\]
+
+\textbf{Step 2 — Log-likelihood:}
+\[
+\ell(\mathbf{w}) = \sum_n \Bigl[ t_n \log g(\mathbf{x}_n \mid \mathbf{w}) + (1-t_n)\log(1 - g(\mathbf{x}_n \mid \mathbf{w})) \Bigr]
+\]
+
+\textbf{Step 3 — Maximise (equivalently minimise the negative):}
+\[
+\underset{\mathbf{w}}{\arg\max}\;\ell(\mathbf{w})
+= \underbrace{\underset{\mathbf{w}}{\arg\min}\;
+-\sum_n \Bigl[ t_n \log g(\mathbf{x}_n \mid \mathbf{w}) + (1-t_n)\log(1-g(\mathbf{x}_n \mid \mathbf{w})) \Bigr]}_{\text{Binary Cross-Entropy}}
+\]
+
+\begin{insightbox}[Cross-entropy loss = MLE under Bernoulli assumption]
+The binary cross-entropy loss is not a heuristic — it is the exact negative log-likelihood under the assumption that targets are Bernoulli random variables parameterised by the network output. Since the sigmoid output lies in $(0,1)$, pairing it with cross-entropy is the statistically correct choice for binary classification.
+\end{insightbox}
+
+For multi-class classification with $K$ classes and softmax output, the same MLE derivation under a categorical (multinoulli) distribution gives the \term{categorical cross-entropy}:
+\[
+E(\mathbf{w}) = -\sum_{n=1}^N \sum_{k=1}^K t_{nk} \log y_k(\mathbf{x}_n \mid \mathbf{w})
+\]
+where $t_{nk}$ is the one-hot encoded label and $y_k$ is the softmax output for class $k$.
+
+\subsection{Summary: Choosing the Loss Function}
+
+\begin{tcolorbox}[colback=LightBlue,colframe=AccentBlue,boxrule=0.8pt,arc=3pt]
+\textbf{Loss Function Selection Guide}\\[6pt]
+\begin{tabular}{@{}llll@{}}
+\toprule
+\textbf{Task} & \textbf{Output activation} & \textbf{Loss function} & \textbf{Noise model} \\
+\midrule
+Regression & Linear & Sum of Squared Errors & Gaussian \\
+Binary classif.\ $\{0,1\}$ & Sigmoid & Binary Cross-Entropy & Bernoulli \\
+Binary classif.\ $\{-1,+1\}$ & Tanh & Binary Cross-Entropy (mod.) & Bernoulli \\
+Multi-class ($K$ classes) & Softmax & Categorical Cross-Entropy & Categorical \\
+\bottomrule
+\end{tabular}\\[6pt]
+The guiding principle is always the same: choose the loss that corresponds to the MLE under a probability model appropriate for the type of output. In practice you can also design custom losses using domain knowledge or creativity, but this requires trial and error.
+\end{tcolorbox}
+
+\begin{warnbox}[A common exam question: why SSE for regression and cross-entropy for classification?]
+The answer is \emph{not} just ``because they work well''. The SSE arises from MLE under a Gaussian noise assumption on the targets. The cross-entropy arises from MLE under a Bernoulli (or categorical) assumption. Mismatching loss and output activation (e.g., SSE with sigmoid output for classification) is theoretically inconsistent and often performs poorly in practice.
+\end{warnbox}
+
+%=========================================================
+\section{Big Picture Summary}
+%=========================================================
+
+\begin{tcolorbox}[colback=AlgoPurpleBg,colframe=AlgoPurple,boxrule=1pt,arc=4pt,
+  title={\bfseries\color{white} ANN/DL Concepts Overview},
+  attach boxed title to top left={yshift=-2mm,xshift=4mm},
+  boxed title style={colback=AlgoPurple,rounded corners,boxrule=0pt}]
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{Model} & \textbf{Expressiveness} & \textbf{Learning Algorithm} \\
+\midrule
+Single perceptron & Linearly separable only & Hebbian (SGD on perceptron criterion) \\
+Two-layer MLP & Convex regions & Backpropagation + Gradient Descent \\
+Deep MLP ($\geq 3$ layers) & Arbitrary regions & Backpropagation + mini-batch SGD \\
+\bottomrule
+\end{tabular}\\[8pt]
+\begin{tabular}{@{}ll@{}}
+\toprule
+\textbf{Task} & \textbf{Loss $\equiv$ MLE under} \\
+\midrule
+Regression & SSE $\equiv$ Gaussian noise \\
+Binary classification & Cross-entropy $\equiv$ Bernoulli \\
+Multi-class classification & Cat.\ cross-entropy $\equiv$ Categorical \\
+\bottomrule
+\end{tabular}
+\end{tcolorbox}
+
+\begin{insightbox}[Unifying thread]
+Every concept in these notes is an instance of the same idea: \emph{find the parameters that make the training data most likely under a chosen probability model}. The architecture determines what function class is available; the activation functions determine expressiveness and differentiability; the loss function encodes the probabilistic model; and gradient descent with backpropagation is the engine that finds the parameters. Understanding each piece and how they connect is what the exam will test.
+\end{insightbox}
+
+
+
+%=========================================================
+\section{Overfitting, Generalization, and Regularization}
+%=========================================================
+
+\subsection{Model Complexity and the Bias-Variance Trade-off}
+
+The Universal Approximation Theorem guarantees that a single hidden layer is \emph{sufficient in principle} to represent any function, but it says nothing about whether we can \emph{find} those weights, or whether the resulting model will \emph{generalise} to new data. Two failure modes flank the ideal model:
+
+\begin{itemize}
+  \item \textbf{Underfitting (too simple):} the model $M_1$ lacks the capacity to capture the true structure of the data. Training error is high.
+  \item \textbf{Overfitting (too complex):} the model $M_2$ is so expressive that it fits the training data exactly, including its noise, but fails to generalise to unseen examples. Training error is low but test error is high.
+\end{itemize}
+
+The ideal model $M_n$ lies between these extremes: complex enough to capture the true pattern, simple enough not to memorise noise. This trade-off is captured by William of Ockham's principle: \emph{Entia non sunt multiplicanda praeter necessitatem} --- entities must not be multiplied beyond necessity. In modern terms: prefer the simplest model that explains the data adequately.
+
+\begin{defbox}{Inductive Hypothesis}
+A solution that approximates the target function well over a sufficiently large set of training examples will also approximate it well over unobserved examples — provided the training data is representative of the true data distribution.
+\end{defbox}
+
+\subsection{Measuring Generalization: Training vs Test Error}
+
+Training error is a \emph{pessimistic} measure of model quality: the model was optimised on those very examples, so any estimate of future performance based on training error alone is optimistic and unreliable. Three reasons:
+\begin{itemize}
+  \item The classifier has been learned from the training data — any error estimate based on that same data will be biased downward.
+  \item New data will not be exactly the same as training data (distribution shift, noise).
+  \item Patterns can be found even in purely random data if the model is complex enough.
+\end{itemize}
+
+To obtain an honest estimate of future performance, we must evaluate on an \term{independent test set} that was not used during training. Three ways to obtain such a set: (1) someone provides an external dataset; (2) split the available data and hide part for later evaluation; (3) random subsampling with replacement (bootstrap). In classification, always use \term{stratified sampling} to preserve the class distribution in each split.
+
+\subsection{Dataset Terminology}
+
+A common source of confusion is the distinction between the various data splits. The following definitions are standard:
+
+\begin{tcolorbox}[colback=LightBlue,colframe=AccentBlue,boxrule=0.8pt,arc=3pt]
+\textbf{Data Split Terminology}\\[6pt]
+\begin{tabular}{@{}ll@{}}
+\toprule
+\textbf{Term} & \textbf{Role} \\
+\midrule
+Training dataset & All available labelled data \\
+Training set & Subset used to \emph{learn model parameters} (weights $\mathbf{w}$) \\
+Validation set & Subset used for \emph{model selection} (hyperparameter tuning) \\
+Test set & Subset used for \emph{final assessment only} — never touched during development \\
+Training data & Training set + Validation set (used for fitting + selection) \\
+Validation data & Validation set + Test set (used for selection + assessment) \\
+\bottomrule
+\end{tabular}
+\end{tcolorbox}
+
+\begin{warnbox}[The test set must never be used during development]
+The test set gives an unbiased estimate of generalisation error only if it has never influenced any modelling decision. Using the test set to select hyperparameters or compare models invalidates it as an unbiased estimator — you have effectively trained on it implicitly. This is one of the most common mistakes in applied machine learning.
+\end{warnbox}
+
+\subsection{Cross-Validation}
+
+\term{Cross-validation} is the general approach of using the training dataset both to train the model (parameter fitting) and to estimate its error on new data (model selection). The specific technique depends on how much data is available.
+
+\subsubsection{Hold-Out Validation}
+
+The simplest approach: split the training dataset into a training set and a validation set. Train on the training set, evaluate on the validation set. Fast and practical when data is abundant.
+
+\begin{notebox}[Limitation of Hold-Out]
+The hold-out error estimate may be biased by the specific split chosen. If by chance the validation set is not representative (e.g.\ contains easy or hard examples), the estimate will be misleading. This is why more robust procedures are needed when data is limited.
+\end{notebox}
+
+\subsubsection{Leave-One-Out Cross-Validation (LOOCV)}
+
+At the opposite extreme: for a dataset of $N$ examples, train $N$ separate models, each time leaving out exactly one example as the validation sample. The generalisation error estimate is:
+\[
+\hat{E} = \frac{1}{N}\sum_{n=1}^N E(x_n \mid \mathbf{w}_{-n})
+\]
+where $\mathbf{w}_{-n}$ denotes the weights learned without example $n$. LOOCV is nearly unbiased (each model is trained on $N-1$ examples, very close to the full dataset) but computationally infeasible for large $N$ since it requires training $N$ models.
+
+\subsubsection{K-Fold Cross-Validation}
+
+The standard practical compromise: partition the training dataset into $K$ roughly equal folds. In each of the $K$ rounds, use one fold as the validation set and the remaining $K-1$ folds as the training set. The generalisation error estimate is:
+
+\begin{defbox}{K-Fold Cross-Validation Error}
+\[
+\hat{e}_k = \frac{1}{|N_k|}\sum_{n_k \in N_k} E(x_{n_k} \mid \mathbf{w}),
+\qquad
+\hat{E} = \frac{1}{K}\sum_{k=1}^K \hat{e}_k
+\]
+where $N_k$ is the set of examples in fold $k$ and $|N_k|$ is its size.
+\end{defbox}
+
+K-fold CV is a good trade-off between LOOCV (unbiased but expensive) and hold-out (cheap but high variance). Typical values are $K = 5$ or $K = 10$. Note that LOOCV is the special case $K = N$.
+
+\begin{insightbox}[What to do with the K models after cross-validation?]
+After K-fold CV, you have $K$ trained models (one per fold). These are used \emph{only to estimate the generalisation error}. Once the best hyperparameters are selected, you retrain a \emph{single final model} on the entire training dataset with those hyperparameters.
+\end{insightbox}
+
+\subsection{Hyperparameter Tuning and the Two Levels of Optimisation}
+
+Model selection happens at two distinct levels:
+
+\begin{enumerate}
+  \item \textbf{Parameters level:} learning the weights $\mathbf{w}$ of the network via gradient descent. This is done on the training set.
+  \item \textbf{Hyperparameters level:} choosing the architecture (number of layers $L$, number of neurons per layer $J^{(l)}$, regularisation strength $\gamma$, etc.). This is done using the validation set.
+\end{enumerate}
+
+Cross-validation can be applied at both levels. At the hyperparameter level, one common approach is:
+\begin{enumerate}
+  \item For each candidate hyperparameter configuration, train the model and measure validation error (using K-fold or hold-out).
+  \item Select the configuration with the lowest validation error.
+  \item Retrain the final model on the full training dataset using the selected hyperparameters.
+  \item Report the generalisation error on the (untouched) test set.
+\end{enumerate}
+
+\begin{warnbox}[Computational cost of hyperparameter search]
+Each candidate hyperparameter configuration requires training a full model (possibly $K$ times for K-fold CV). This cost grows quickly with the number of hyperparameters and candidate values. Always be mindful of the computational budget.
+\end{warnbox}
+
+%=========================================================
+\section{Techniques for Preventing Overfitting}
+%=========================================================
+
+\subsection{Early Stopping}
+
+\term{Early stopping} is the simplest and most widely used regularisation technique. The key observation is that, during gradient descent, the training error decreases monotonically (on average with SGD), but the validation error follows a U-shaped curve: it decreases initially as the model learns genuine patterns, then increases as the model starts memorising training noise.
+
+\begin{algobox}{Early Stopping Procedure}
+\begin{enumerate}
+  \item Hold out a validation set from the training data.
+  \item Train the network on the training set, monitoring validation error at each iteration $k$.
+  \item Stop training at iteration $k_{\mathrm{ES}}$ when the validation error starts to increase consistently.
+  \item Use the weights $\mathbf{w}^{k_{\mathrm{ES}}}$ as the final model, which achieves validation error $E_{\mathrm{ES}}(\mathbf{x} \mid \mathbf{w})$.
+\end{enumerate}
+\end{algobox}
+
+The validation error serves as an \emph{online estimate of the generalisation error} throughout training. By stopping at $k_{\mathrm{ES}}$, we select the point where the model has learned the most useful structure without yet overfitting.
+
+Early stopping can also be used for \term{hyperparameter tuning}: train with different architectures (e.g.\ different numbers of hidden neurons $J^{(1)}$), apply early stopping to each, and select the architecture with the lowest early-stopping validation error. The model with the best validation error is then retrained or directly used.
+
+\begin{insightbox}[Early stopping as implicit regularisation]
+Early stopping implicitly constrains the effective number of parameters: stopping early prevents the weights from growing large and fitting noise. It is approximately equivalent to L2 regularisation under certain conditions. Its main advantage is that it requires no modification to the loss function and adds essentially no computational overhead.
+\end{insightbox}
+
+\subsection{Weight Decay (L2 Regularisation)}
+
+\subsubsection{From MLE to MAP: Adding a Prior on Weights}
+
+So far we have used \term{Maximum Likelihood Estimation}: $\mathbf{w}_{\mathrm{MLE}} = \arg\max_\mathbf{w} P(\mathcal{D} \mid \mathbf{w})$. This maximises the probability of the data given the weights, but places no constraint on the weights themselves. We can reduce model ``freedom'' by introducing a \emph{prior distribution} over the weights and using \term{Maximum A-Posteriori} (MAP) estimation:
+\[
+\mathbf{w}_{\mathrm{MAP}} = \arg\max_\mathbf{w} P(\mathbf{w} \mid \mathcal{D}) = \arg\max_\mathbf{w} P(\mathcal{D} \mid \mathbf{w}) \cdot P(\mathbf{w})
+\]
+where the second equality follows from Bayes' theorem (dropping the constant denominator $P(\mathcal{D})$).
+
+Empirically, small weights tend to improve generalisation of neural networks. A natural prior encoding this belief is a zero-mean Gaussian:
+\[
+P(\mathbf{w}) \sim \mathcal{N}(\mathbf{0},\, \sigma_w^2 \mathbf{I}), \qquad
+p(w_q) = \frac{1}{\sqrt{2\pi}\,\sigma_w}\exp\!\left(-\frac{w_q^2}{2\sigma_w^2}\right)
+\]
+
+\subsubsection{Derivation of the L2-Regularised Loss}
+
+Assuming Gaussian noise on the targets (regression setting) and a Gaussian prior on weights:
+
+\begin{align*}
+\mathbf{w}_{\mathrm{MAP}} &= \arg\max_\mathbf{w}\; P(\mathcal{D} \mid \mathbf{w})\cdot P(\mathbf{w}) \\
+&= \arg\max_\mathbf{w}\; \prod_{n=1}^N \frac{1}{\sqrt{2\pi}\,\sigma} e^{-\frac{(t_n - g(\mathbf{x}_n|\mathbf{w}))^2}{2\sigma^2}}
+\cdot \prod_{q=1}^Q \frac{1}{\sqrt{2\pi}\,\sigma_w} e^{-\frac{w_q^2}{2\sigma_w^2}} \\
+&= \arg\min_\mathbf{w}\; \sum_{n=1}^N \frac{(t_n - g(\mathbf{x}_n|\mathbf{w}))^2}{2\sigma^2}
++ \sum_{q=1}^Q \frac{w_q^2}{2\sigma_w^2} \\
+&= \arg\min_\mathbf{w}\; \underbrace{\sum_{n=1}^N (t_n - g(\mathbf{x}_n|\mathbf{w}))^2}_{\text{Fitting term (SSE)}}
++ \underbrace{\gamma \sum_{q=1}^Q w_q^2}_{\text{Regularisation term}}
+\end{align*}
+
+where $\gamma = \sigma^2 / \sigma_w^2$ is the \term{regularisation coefficient}, which controls the relative importance of the prior versus the data likelihood.
+
+\begin{defbox}{L2-Regularised Loss (Weight Decay)}
+\[
+E_\gamma(\mathbf{w}) = \sum_{n=1}^N (t_n - g(\mathbf{x}_n|\mathbf{w}))^2 + \gamma \sum_{q=1}^Q w_q^2
+\]
+The second term penalises large weights, pulling them toward zero. This is called \term{weight decay} because the gradient of the penalty $\frac{\partial}{\partial w_q}\gamma w_q^2 = 2\gamma w_q$ adds a term $-2\eta\gamma w_q$ to the gradient descent update, which shrinks (decays) every weight at each step.
+\end{defbox}
+
+\begin{insightbox}[Weight Decay = MAP under Gaussian prior]
+Minimising the L2-regularised loss is exactly equivalent to MAP estimation under a zero-mean Gaussian prior on the weights. The regularisation coefficient $\gamma = \sigma^2/\sigma_w^2$ encodes how strongly we believe weights should be small relative to the noise level. A large $\gamma$ forces weights close to zero (high regularisation, underfitting risk); a small $\gamma$ approaches MLE (low regularisation, overfitting risk).
+\end{insightbox}
+
+\subsubsection{Choosing $\gamma$ via Cross-Validation}
+
+The optimal $\gamma$ is a hyperparameter that must be selected using the validation set. The procedure is:
+\begin{enumerate}
+  \item Train the model for several candidate values of $\gamma$ (e.g.\ $0.1, 1, 5, 100, \ldots$), each minimising $E_\gamma^{\mathrm{TRAIN}}(\mathbf{w}) = \sum_n (t_n - g(\mathbf{x}_n|\mathbf{w}))^2 + \gamma \sum_q w_q^2$ on the training set.
+  \item For each $\gamma$, evaluate the \emph{unregularised} validation error: $E_\gamma^{\mathrm{VAL}} = \sum_{n \in \mathrm{val}} (t_n - g(\mathbf{x}_n|\mathbf{w}))^2$.
+  \item Select $\gamma^*$ with the lowest validation error.
+  \item Retrain on the full dataset minimising $E_{\gamma^*}(\mathbf{w})$.
+\end{enumerate}
+Note that the validation error is computed \emph{without} the regularisation term — we want to measure prediction quality, not penalised loss.
+
+\subsection{Dropout: Stochastic Regularisation}
+
+\term{Dropout} is a regularisation technique that randomly disables neurons during training, forcing the network to learn robust, redundant representations. The idea is to prevent \term{co-adaptation}: the tendency of hidden units to rely on each other in ways that do not generalise.
+
+\begin{defbox}{Dropout}
+At each training step, each hidden unit $j$ in layer $l$ is independently set to zero with probability $p_j^{(l)}$ (a typical value is $p_j^{(l)} = 0.3$, i.e.\ 30\% dropout rate). This is implemented via a binary mask:
+\[
+m^{(l)} = [m_1^{(l)}, \ldots, m_{J^{(l)}}^{(l)}], \quad m_j^{(l)} \sim \mathrm{Be}(p_j^{(l)})
+\]
+The layer output becomes:
+\[
+h^{(l)} = h_j^{(l)}\bigl(W^{(l)}\, h^{(l-1)} \odot m^{(l)}\bigr)
+\]
+where $\odot$ denotes element-wise multiplication. At each training step a different random mask is sampled, so the network effectively trains on a different sub-network each time.
+\end{defbox}
+
+At test time, dropout is turned off and all neurons are active. To account for the fact that each unit was active only a fraction $(1-p_j^{(l)})$ of training steps, the weights are scaled by that factor: $w \leftarrow (1 - p_j^{(l)}) \cdot w$. This ensures that the expected activation at test time matches the expected activation during training.
+
+\begin{insightbox}[Dropout as ensemble learning]
+Dropout can be interpreted as training an exponentially large ensemble of different network architectures (one for each possible binary mask) and averaging their predictions at test time. Since all sub-networks share the same weights, this is computationally equivalent to running the full network with scaled weights. This ensemble interpretation explains why dropout is such a powerful regulariser.
+\end{insightbox}
+
+\begin{tcolorbox}[colback=LightBlue,colframe=AccentBlue,boxrule=0.8pt,arc=3pt]
+\textbf{Regularisation Techniques: Summary Comparison}\\[6pt]
+\begin{tabular}{@{}llll@{}}
+\toprule
+\textbf{Method} & \textbf{Mechanism} & \textbf{Hyperparameter} & \textbf{Cost} \\
+\midrule
+Early Stopping & Stop before overfitting & $k_{\mathrm{ES}}$ (implicit) & Negligible \\
+Weight Decay (L2) & Penalise large weights (MAP) & $\gamma$ & Negligible \\
+Dropout & Random neuron masking & $p_j^{(l)}$ per layer & Moderate \\
+\bottomrule
+\end{tabular}\\[6pt]
+All three methods reduce effective model complexity and can be combined. In practice, dropout and weight decay are complementary and often used together in deep networks.
+\end{tcolorbox}
+
+
+
+%=========================================================
+\section{Convolutional Neural Networks (CNNs)}
+\label{sec:cnns}
+%=========================================================
+
+\subsection{Motivation: From Hand-Crafted to Data-Driven Features}
+
+A central question in visual recognition is: \emph{what feature representation should we feed to a classifier?} The classical pipeline uses \term{hand-crafted features} — human-designed algorithms that compress an image into a meaningful vector (e.g.\ average height, area, perimeter for parcel classification, or SIFT/HoG for natural images). A downstream classifier (tree, SVM, MLP) then operates on this fixed vector.
+
+\begin{tcolorbox}[colback=LightBlue,colframe=AccentBlue,boxrule=0.8pt,arc=3pt]
+\textbf{Pros and Cons of Hand-Crafted Features}\\[4pt]
+\begin{tabular}{@{}p{0.47\linewidth}p{0.47\linewidth}@{}}
+\toprule
+\textbf{Advantages} & \textbf{Disadvantages} \\
+\midrule
+Exploit prior / expert knowledge & Require significant design effort \\
+Features are interpretable & Risk overfitting the design set \\
+Adjustable when not working & Not portable across domains \\
+Little training data needed & Not viable for complex visual tasks \\
+Can weight features differently & Hard to scale (e.g.\ car vs.\ motorbike) \\
+\bottomrule
+\end{tabular}
+\end{tcolorbox}
+
+The key limitation is practical: \emph{can you write a program that takes an image as input and decides whether it contains a car or a motorbike?} For humans, this is trivial; for a hand-crafted feature designer, it is nearly impossible. \term{Deep Learning} solves this by learning both the features \emph{and} the classifier jointly from data.
+
+\begin{defbox}{Data-Driven Feature Extraction (CNN paradigm)}
+In a CNN, the feature extraction stage is itself a learnable function, parameterised by convolutional filter weights. The whole pipeline — from raw pixels to class probabilities — is optimised end-to-end by gradient descent on labelled data.
+\end{defbox}
+
+\subsection{Linear Filtering and Correlation}
+\label{sec:filtering}
+
+Before introducing CNNs, it is helpful to recall classical image filtering, since convolution is the core operation in CNNs.
+
+\begin{defbox}{Correlation (Cross-Correlation)}
+Given an image $I \in \mathbb{R}^{r \times c}$ and a filter (kernel) $w$ defined over a spatial neighbourhood $U$, the \term{correlation} output is:
+\[
+T_I(r,c) = \sum_{(u,v)\in U} w(u,v)\cdot I(r+u,\, c+v)
+\]
+Each output pixel is a \emph{linear combination} of its spatial neighbourhood in the input, weighted by the filter $w$. The filter $w$ entirely defines the operation.
+\end{defbox}
+
+Common examples:
+\begin{itemize}
+  \item \textbf{Identity filter} $\begin{pmatrix}0&0&0\\0&1&0\\0&0&0\end{pmatrix}$: output equals input.
+  \item \textbf{Box filter} $\frac{1}{9}\begin{pmatrix}1&\cdots&1\\\vdots&\ddots&\vdots\\1&\cdots&1\end{pmatrix}$: averages all neighbours — blurs the image.
+  \item \textbf{Edge detection filter}: highlights intensity discontinuities.
+  \item \textbf{Motion blur filter}: simulates camera motion along a trajectory.
+\end{itemize}
+
+\subsubsection{Convolution vs.\ Correlation}
+
+\begin{defbox}{Convolution}
+\[
+T_I(r,c) = \sum_{(u,v)\in U} w(u,v)\cdot I(r-u,\, c-v)
+\equiv \sum_{(u,v)\in U} w(-u,-v)\cdot I(r+u,\, c+v)
+\]
+Convolution is equivalent to correlation with a \emph{flipped} filter. In image processing, convolution is preferred because it satisfies elegant Fourier-domain properties (convolution theorem). However, in CNNs the distinction is irrelevant: since filters are \emph{learned}, using a flipped or unflipped version simply yields a mirrored filter — the network learns the right one either way. \textbf{In practice, all modern CNN frameworks implement correlation, not convolution}, despite calling it ``Conv2D''.
+\end{defbox}
+
+\begin{insightbox}[Why CNNs use correlation not convolution]
+The only difference between convolution and correlation is a flip of the kernel. Since CNN filters are learned from data, the network will simply learn the flipped version of whatever the ``correct'' filter should be. The choice of operation does not matter for expressiveness or learning dynamics; the name ``convolutional neural network'' is historical.
+\end{insightbox}
+
+\subsubsection{Convolution in CNNs vs.\ Classical Image Filtering}
+
+In classical image filtering, RGB images are filtered \emph{channel-independently}: the filter is applied separately to $R$, $G$, $B$, and the output is still RGB. Channels are \emph{not mixed}.
+
+In CNNs, convolution always \emph{mixes all channels}:
+\[
+(I \circledast w_l)(r,c) = \sum_{k=1}^{C}\sum_{(u,v)\in U} w_l(u,v,k)\cdot I(r+u,\, c+v,\, k)
+\]
+The result is a single 2D activation map per filter $l$. Input channels are always summed over, producing richer cross-channel features.
+
+\subsubsection{Padding}
+
+When computing the output near image boundaries, the filter extends beyond the valid domain. The standard solutions are:
+\begin{itemize}
+  \item \textbf{Zero-padding} (\texttt{padding='same'}): pad the image with zeros. This is the most common choice because it preserves the spatial output size.
+  \item \textbf{No padding} (\texttt{padding='valid'}): only compute outputs where the filter fits entirely inside the image. Spatial size shrinks.
+  \item \textbf{Symmetric/reflect padding}: mirror the image at the boundary.
+\end{itemize}
+
+\subsubsection{Stride}
+
+The \term{stride} controls how many pixels the filter jumps between applications:
+\begin{itemize}
+  \item \textbf{Stride 1}: standard convolution, full overlap.
+  \item \textbf{Stride 2}: filter jumps 2 pixels each step, output spatial size halved. Equivalent to convolution followed by downsampling, but more computationally efficient as a single operation.
+\end{itemize}
+Strided convolutions are widely used in CNNs to reduce spatial resolution, often replacing max-pooling in modern architectures.
+
+\begin{warnbox}[Exam point: stride vs.\ pooling]
+Both strided convolution and max-pooling reduce spatial dimensions. The difference is that max-pooling introduces a \emph{nonlinear} operation (taking the maximum), while strided convolution is \emph{linear} (though followed by a nonlinear activation). Both increase the receptive field of subsequent layers.
+\end{warnbox}
+
+%------------------------------------------------------------
+\subsection{CNN Architecture Overview}
+%------------------------------------------------------------
+
+A CNN processes an input image through a sequence of \term{volumes} (3D tensors: height $\times$ width $\times$ depth/channels). As we progress through the network:
+\begin{itemize}
+  \item Spatial dimensions (height, width) \emph{decrease}.
+  \item The number of channels (depth) \emph{increases}.
+  \item The abstract complexity of the represented features \emph{increases}.
+\end{itemize}
+
+The typical CNN has three functional stages:
+
+\begin{tcolorbox}[colback=LightBlue,colframe=AccentBlue,boxrule=0.8pt,arc=3pt]
+\textbf{CNN Building Blocks}\\[4pt]
+\begin{enumerate}
+  \item \textbf{Feature Extraction Network (FEN):} a stack of \emph{convolutional blocks}, each consisting of Convolutional Layer $\to$ Activation $\to$ Pooling. Learns hierarchical, increasingly abstract features.
+  \item \textbf{Flattening:} converts the final spatial volume into a vector (or replaced by Global Average Pooling).
+  \item \textbf{Dense / Fully-Connected layers:} a classical MLP that maps the feature vector to class probabilities.
+\end{enumerate}
+\end{tcolorbox}
+
+%------------------------------------------------------------
+\subsection{Convolutional Layers}
+\label{sec:conv_layers}
+%------------------------------------------------------------
+
+\begin{defbox}{Convolutional Layer}
+A convolutional layer with $N_F$ filters produces an output activation volume $a \in \mathbb{R}^{R' \times C' \times N_F}$ from an input volume $x \in \mathbb{R}^{R \times C \times C_\text{in}}$:
+\[
+a(r,c,l) = \sum_{\substack{(u,v)\in U \\ k=1,\ldots,C_\text{in}}} w^l(u,v,k)\cdot x(r+u,\,c+v,\,k) + b^l, \qquad \forall\,(r,c),\; l=1,\ldots,N_F
+\]
+\textbf{Parameters:}
+\begin{itemize}
+  \item Weights: $h_r \cdot h_c \cdot C_\text{in} \cdot N_F$ (filter weights)
+  \item Biases: $N_F$ (one per filter)
+  \item \textbf{Total:} $h_r \cdot h_c \cdot C_\text{in} \cdot N_F + N_F$
+\end{itemize}
+The filter spatial size $(h_r, h_c)$ must be specified; the depth $C_\text{in}$ equals the number of input channels automatically.
+\end{defbox}
+
+Key observations:
+\begin{itemize}
+  \item Each filter $w^l$ spans the \emph{full depth} of the input but only a \emph{small spatial neighbourhood} $U$. This is the fundamental difference from a dense layer.
+  \item Different filters applied to the same input produce different ``slices'' (channels) in the output volume. Each filter learns to detect a different feature (e.g.\ horizontal edges, colour blobs, textures).
+  \item The \emph{same filter} is applied at every spatial location (weight sharing) — this is what gives CNNs their \term{translation equivariance}.
+\end{itemize}
+
+\subsubsection{CNN Arithmetic: Parameter Count Example}
+
+\begin{tcolorbox}[colback=NoteGrayBg,colframe=NoteGray,boxrule=0.8pt,arc=3pt]
+\textbf{Example:} 3 input channels, 2 filters of size $5\times5$.\\
+Filter weights: $3 \times 5 \times 5 \times 2 = 150$. Biases: $2$. \textbf{Total: 152 parameters}.
+\end{tcolorbox}
+
+\begin{insightbox}[Exam question: parameter count for a conv layer]
+Given a conv layer with filter size $(h_r, h_c)$, $C_\text{in}$ input channels, and $N_F$ filters:
+\[
+\text{Parameters} = h_r \cdot h_c \cdot C_\text{in} \cdot N_F + N_F
+\]
+Two layers with identical hyperparameters $(h_r, h_c, N_F)$ can have \emph{different} parameter counts if they sit at different positions in the network (different $C_\text{in}$). Always check the depth of the input volume.
+\end{insightbox}
+
+%------------------------------------------------------------
+\subsection{Activation Layers}
+%------------------------------------------------------------
+
+Activation functions introduce \emph{nonlinearity} into the network. Without them, stacking multiple convolutional layers would be equivalent to a single linear operation — the CNN would reduce to a linear classifier. Activations operate element-wise on each value in the volume and do \emph{not} change the volume size.
+
+\begin{defbox}{ReLU (Rectified Linear Unit)}
+\[
+\mathrm{ReLU}(x) = \max(0,\, x) = \begin{cases} x & x \geq 0 \\ 0 & x < 0 \end{cases}
+\]
+By far the most popular activation in deep CNNs (introduced prominently in AlexNet, 2012). Advantages: computationally trivial, does not suffer from vanishing gradients for positive activations, promotes sparsity.\\
+\textbf{Dying ReLU problem:} neurons with consistently negative pre-activations output zero permanently — their gradient is zero and they never recover. Addressed by Leaky ReLU.
+\end{defbox}
+
+\begin{defbox}{Leaky ReLU}
+\[
+\mathrm{LeakyReLU}(x) = \begin{cases} x & x \geq 0 \\ 0.01\,x & x < 0 \end{cases}
+\]
+Allows a small gradient for negative inputs, preventing neurons from dying permanently.
+\end{defbox}
+
+\begin{defbox}{Sigmoid and Tanh}
+\[
+\sigma(x) = \frac{1}{1+e^{-2x}} \in (0,1), \qquad \tanh(x) = \frac{2}{1+e^{-2x}} - 1 \in (-1,1)
+\]
+Both are smooth and differentiable everywhere, and were historically popular in MLP architectures. They suffer from \term{vanishing gradients} for large $|x|$ (slope $\approx 0$), which hampers training of deep networks. Still commonly used in the \emph{output layer} (sigmoid for binary classification, softmax for multiclass).
+\end{defbox}
+
+\begin{warnbox}[Exam: which activation for which layer?]
+\textbf{Hidden layers:} ReLU or Leaky ReLU (avoid vanishing gradients, fast). \textbf{Binary output:} Sigmoid (outputs probability in $(0,1)$). \textbf{Multiclass output:} Softmax. \textbf{Regression output:} Linear (no activation). Sigmoid and tanh are mostly deprecated in hidden layers of deep CNNs.
+\end{warnbox}
+
+%------------------------------------------------------------
+\subsection{Pooling Layers}
+%------------------------------------------------------------
+
+\begin{defbox}{Pooling Layer}
+Pooling layers reduce the \emph{spatial} size of the volume while preserving (or increasing) the depth. They operate independently on each channel and apply a fixed aggregation function over a local patch.\\
+\textbf{Max-pooling} (most common): takes the maximum value in each patch. With a $2\times2$ patch and stride 2, it reduces each spatial dimension by half (discards 75\% of values).\\
+\textbf{Average-pooling}: takes the mean (used in LeNet-5, less common in modern nets).
+\end{defbox}
+
+\subsubsection{Backpropagation Through Max-Pooling}
+
+During the backward pass, the gradient is routed \emph{only} through the input element that achieved the maximum in the forward pass. All other positions receive zero gradient. Formally, the derivative is 1 at the argmax position and 0 elsewhere.
+
+\subsubsection{Stride in Pooling}
+
+Typically the stride equals the pooling window size (e.g.\ $2\times2$ pool, stride 2), ensuring non-overlapping regions and halving spatial size. Using stride 1 with max-pooling performs a nonlinear operation without spatial reduction — sometimes useful as a local nonlinearity.
+
+%------------------------------------------------------------
+\subsection{Dense (Fully-Connected) Layers and Flattening}
+%------------------------------------------------------------
+
+After the convolutional blocks, the spatial volume must be converted to a 1D vector before feeding into standard MLP layers. This is done by a \term{Flatten} layer, which unrolls all spatial and channel dimensions into a single vector. From this point, the network is a standard MLP: each output neuron is connected to \emph{every} input neuron.
+
+The final dense layer has as many neurons as there are output classes ($L$), followed by a Softmax for multiclass or Sigmoid for binary classification.
+
+\begin{notebox}[Flattening vs.\ Global Average Pooling]
+Flattening preserves all spatial information (large vector, many parameters). Global Average Pooling (GAP) compresses each channel to a single scalar, drastically reducing parameters. GAP is preferred in modern architectures (see Section~\ref{sec:nin}).
+\end{notebox}
+
+%------------------------------------------------------------
+\subsection{Sparse and Shared Weights: CNNs vs.\ MLPs}
+\label{sec:sparse_shared}
+%------------------------------------------------------------
+
+Convolution can be written as a matrix-vector multiplication $\mathbf{a} = W\mathbf{x} + \mathbf{b}$, just like a dense layer. The fundamental difference lies in the \emph{structure} of $W$:
+
+\begin{tcolorbox}[colback=LightBlue,colframe=AccentBlue,boxrule=0.8pt,arc=3pt]
+\textbf{Dense Layer vs.\ Convolutional Layer}\\[4pt]
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{Property} & \textbf{Dense (FC) Layer} & \textbf{Conv Layer} \\
+\midrule
+Weight matrix & Dense (all entries free) & Sparse + block-circulant \\
+Weight sharing & None & Same filter at all positions \\
+Bias & One per output neuron & One per filter (shared) \\
+Inductive bias & None & Translation equivariance \\
+Parameters (example) & $(32\!\times\!32)\!\times\!(28\!\times\!28\!\times\!6) = 4.8\text{M}$ & $25\!\times\!6 + 6 = 156$ \\
+\bottomrule
+\end{tabular}
+\end{tcolorbox}
+
+\begin{defbox}{Translation Equivariance (Inductive Bias)}
+In a CNN, all neurons in the same output channel share identical filter weights. The underlying assumption is: \emph{if a feature is useful to detect at one spatial location, it is equally useful at all other locations}. This is a powerful prior for images, where objects can appear anywhere in the frame. As a result, CNNs generalise better from limited data on spatially structured inputs.
+\end{defbox}
+
+\begin{insightbox}[Why CNNs are not equivariant to scale or rotation]
+Weight sharing gives CNNs translation equivariance ``for free.'' However, they do \emph{not} natively handle scale changes or rotations — unless the training data includes examples at all relevant scales and orientations, or data augmentation is used. This is a key limitation motivating data augmentation (Section~\ref{sec:augmentation}).
+\end{insightbox}
+
+%------------------------------------------------------------
+\subsection{The Receptive Field}
+\label{sec:receptive_field}
+%------------------------------------------------------------
+
+\begin{defbox}{Receptive Field}
+The \term{receptive field} of a neuron in layer $l$ is the set of input pixels that can influence its value. Due to sparse connectivity, each output neuron only depends on a limited region of the input (unlike a dense layer, where every output depends on all inputs).
+
+\textbf{Key rule:} as depth increases, the receptive field grows. Each additional conv layer of size $3\times3$ adds 2 pixels on each side to the receptive field of the next layer.
+\end{defbox}
+
+\subsubsection{Receptive Field Growth}
+
+For $n$ stacked $3\times3$ conv layers (stride 1, no pooling), the receptive field is:
+\[
+\text{RF} = 1 + 2n \quad (\text{so }n=6 \Rightarrow \text{RF} = 13\times13)
+\]
+Max-pooling with stride 2 doubles the effective receptive field of all subsequent layers. After $n=6$ layers with 3 interleaved $2\times2$ max-pools:
+\[
+\text{RF} = 22\times22 \text{ (roughly)}
+\]
+
+\begin{warnbox}[Exam: compute the receptive field]
+A very common exam question. To compute the receptive field of a neuron at a given layer:
+\begin{enumerate}
+  \item Work backward from the target neuron.
+  \item Each conv $k\times k$ (stride 1) adds $k-1$ pixels in each direction.
+  \item Each max-pool $2\times2$ (stride 2) doubles the current receptive field size.
+  \item Report the size as a single number (side length of the square receptive field).
+\end{enumerate}
+\end{warnbox}
+
+\begin{insightbox}[Deeper = wider receptive field = higher-level features]
+As we go deeper in a CNN, each neuron sees a larger patch of the input. Early layers detect fine-grained, low-level patterns (edges, textures) over small regions. Deeper layers combine these into increasingly abstract, high-level features (object parts, whole objects). Simultaneously, the number of channels grows, encoding richer feature vocabularies.
+\end{insightbox}
+
+%------------------------------------------------------------
+\subsection{CNN Training}
+%------------------------------------------------------------
+
+A CNN is mathematically equivalent to an MLP with a sparse, shared weight matrix. Therefore:
+\begin{itemize}
+  \item Training proceeds by \textbf{gradient descent} minimising a loss function (cross-entropy for classification, MSE for regression).
+  \item Gradients are computed by \textbf{backpropagation} (chain rule), applied through each differentiable layer.
+  \item \textbf{Weight sharing} is respected: the gradient for a shared weight is the \emph{sum} of gradients from all positions where that filter is applied.
+\end{itemize}
+
+\subsubsection{Backpropagation Details for CNN-Specific Layers}
+
+\textbf{Max-pooling:} gradient flows only to the input element that achieved the maximum (argmax). Switch variables (storing which element was maximum during the forward pass) are used to route the backward gradient correctly. All other positions receive gradient 0.
+
+\textbf{ReLU:} $\frac{d}{dx}\mathrm{ReLU}(x) = \mathbf{1}[x>0]$. Gradient passes through unchanged for positive activations, is zeroed for negative ones.
+
+%------------------------------------------------------------
+\subsection{The Latent Representation}
+\label{sec:latent}
+%------------------------------------------------------------
+
+The output of the FEN (just before the final dense layers) is called the \term{latent representation} or \term{feature vector} of the image. This vector encodes the image in a semantically rich space.
+
+\begin{insightbox}[Latent space distances are more meaningful than pixel distances]
+Two images can be pixel-far (e.g.\ same cat in different lighting) but close in the latent space of a well-trained CNN. Conversely, two noise-free images of different classes will be far apart. This property makes the latent space ideal for: classification (MLP on top), image retrieval (nearest neighbour search), and transfer learning.
+\end{insightbox}
+
+\subsubsection{Image Retrieval in the Latent Space}
+
+A powerful application of the learned latent representation is \term{content-based image retrieval}: given a query image, find the most visually similar images from a database by computing nearest neighbours in the latent space.
+
+\begin{lstlisting}[caption={1-NN image retrieval using CNN latent representation (PyTorch)}]
+# Feed the query image to the feature extraction network
+qImg_features = fen(query_image)           # shape: (feature_dim,)
+
+# Feed entire training set through FEN (use batches for efficiency)
+TR_features = fen(X_train_val).cpu().numpy()  # shape: (N, feature_dim)
+
+# Compute L1 distances between query and all training features
+distances = np.mean(np.abs(qImg_features - TR_features), axis=-1)
+
+# Sort by ascending distance
+sorted_idx = distances.argsort()
+
+# Retrieve the closest image and its label
+img_retrieved  = X_train_val[sorted_idx[0]]
+label_retrieved = y_train_val[sorted_idx[0]]
+\end{lstlisting}
+
+%=========================================================
+\section{LeNet-5: The First CNN (1998)}
+\label{sec:lenet}
+%=========================================================
+
+\term{LeNet-5}, introduced by LeCun et al.\ in 1998, is the first successful deep CNN and a landmark in the history of deep learning. It was designed for handwritten digit recognition (MNIST: 28$\times$28 grayscale images, 10 classes).
+
+\begin{defbox}{LeNet-5 Architecture}
+\textbf{Input:} $32\times32\times1$ (grayscale, zero-padded from $28\times28$).\\
+\textbf{Stack:} Conv2D(6, $5\times5$, tanh) $\to$ AvgPool($2\times2$) $\to$ Conv2D(16, $5\times5$, tanh) $\to$ AvgPool($2\times2$) $\to$ Flatten $\to$ Dense(120, relu) $\to$ Dense(84, relu) $\to$ Dense(10, softmax).\\
+\textbf{Total parameters:} 61,706.
+\end{defbox}
+
+\begin{lstlisting}[caption={LeNet-5 in Keras}]
+from keras.models import Sequential
+from keras.layers import Dense, Flatten, Conv2D, AveragePooling2D
+
+model = Sequential([
+    Conv2D(filters=6, kernel_size=(5,5), activation='tanh',
+           input_shape=(32,32,1), padding='valid'),
+    AveragePooling2D(pool_size=(2,2)),
+    Conv2D(filters=16, kernel_size=(5,5), activation='tanh',
+           padding='valid'),
+    AveragePooling2D(pool_size=(2,2)),
+    Flatten(),
+    Dense(120, activation='relu'),
+    Dense(84,  activation='relu'),
+    Dense(10,  activation='softmax'),
+])
+\end{lstlisting}
+
+
+
+\subsubsection{Parameter Count Analysis}
+
+\begin{tcolorbox}[colback=NoteGrayBg,colframe=NoteGray,boxrule=0.8pt,arc=3pt]
+\textbf{Layer-by-layer parameter breakdown:}\\[4pt]
+\begin{tabular}{@{}llr@{}}
+\toprule
+Layer & Formula & Params \\
+\midrule
+Conv2D(6, $5\times5$) on grayscale & $6\times5\times5\times1 + 6$ & 156 \\
+AvgPool & -- & 0 \\
+Conv2D(16, $5\times5$) on 6ch & $16\times5\times5\times6 + 16$ & 2,416 \\
+AvgPool & -- & 0 \\
+Dense(120) on $400=5\times5\times16$ & $400\times120 + 120$ & 48,120 \\
+Dense(84) & $120\times84 + 84$ & 10,164 \\
+Dense(10) & $84\times10 + 10$ & 850 \\
+\midrule
+\textbf{Total} & & \textbf{61,706} \\
+\bottomrule
+\end{tabular}
+\end{tcolorbox}
+
+\begin{insightbox}[Most parameters live in the dense layers]
+In LeNet-5, the two FC layers account for $\approx 95\%$ of parameters, while the convolutional layers account for only $\sim2.6$K of 61K. This illustrates a general principle: convolutional layers are parameter-efficient (weight sharing), while dense layers are parameter-heavy. Modern architectures reduce FC parameters by replacing flattening with Global Average Pooling.
+\end{insightbox}
+
+\begin{insightbox}[CNNs vs.\ flat MLPs on images]
+An MLP taking a $32\times32$ grayscale image directly needs $1024\times84 + \cdots$ weights at the first layer alone. For RGB ($32\times32\times3$), the MLP's first-layer parameters triple, while the CNN's first-layer parameters only increase by a factor of 3 ($6\times5\times5\times1 \to 6\times5\times5\times3$, i.e.\ from 150 to 450). The gap in parameter efficiency widens dramatically for larger images.
+\end{insightbox}
+
+\begin{warnbox}[Why ``valid'' padding at the first LeNet layer?]
+The input images are MNIST digits padded to $32\times32$ — the boundary pixels are black (zero). Using \texttt{valid} padding (no zero-padding) at the first conv layer does not lose any meaningful information, and conveniently reduces the spatial dimension, limiting the size of the latent representation downstream.
+\end{warnbox}
+
+%=========================================================
+\section{CNN Anatomy: Parameters, Weights, and Inductive Bias}
+\label{sec:cnn_anatomy}
+%=========================================================
+
+\subsection{Convolution as Matrix Multiplication}
+
+Because convolution is a linear operation, any convolutional layer can be re-expressed as a dense matrix multiplication $\mathbf{a} = W\mathbf{x} + \mathbf{b}$ over flattened input vectors. The weight matrix $W$ for a conv layer has two special structures:
+
+\begin{enumerate}
+  \item \textbf{Sparsity:} most entries of $W$ are zero. Each output neuron only depends on the neurons in its local receptive field, not all input neurons.
+  \item \textbf{Shared weights (block structure):} the same filter weights repeat across rows of $W$ (shifted), because the same filter is applied at every spatial position.
+\end{enumerate}
+
+Conversely, a fully-connected layer \emph{can} be interpreted as a convolutional layer with a spatial kernel equal to the full input size and no weight sharing (each position uses a different filter). This equivalence is exploited in fully-convolutional networks.
+
+\subsection{Why Sparse + Shared Weights Work}
+
+\begin{tcolorbox}[colback=LightBlue,colframe=AccentBlue,boxrule=0.8pt,arc=3pt]
+\textbf{Parameter efficiency example (LeNet, first layer):}\\[4pt]
+\begin{tabular}{@{}lr@{}}
+\toprule
+Architecture & Params (first layer only) \\
+\midrule
+MLP on $32\times32\times3$ & $(32\times32\times3)\times N_{\text{hidden}} = 3072\times N$ \\
+CNN Conv($6, 5\times5$) on $32\times32\times3$ & $6\times5\times5\times3 + 6 = 456$ \\
+\bottomrule
+\end{tabular}
+\end{tcolorbox}
+
+The saving is the key to training CNNs with feasible data and compute. The inductive bias (translation equivariance) is not only a computational trick — it genuinely matches the structure of visual data.
+
+%=========================================================
+\section{Data Scarcity: Data Augmentation and Transfer Learning}
+\label{sec:data_scarcity}
+%=========================================================
+
+\subsection{Why Deep Models Need Large Datasets}
+
+Deep CNNs (e.g.\ AlexNet with 60M parameters) are only trainable when enough labelled data is available. AlexNet was trained on \textbf{ImageNet}: over 14 million hand-annotated images, 20,000 categories. Two additional enablers: GPU parallelism (NVIDIA GTX 580) and software frameworks (TensorFlow, PyTorch).
+
+In many real applications, annotated data is scarce. The two main solutions are:
+\begin{itemize}
+  \item \textbf{Data Augmentation:} artificially expand the training set by generating new labelled examples from existing ones.
+  \item \textbf{Transfer Learning:} leverage features learned on a large source dataset (e.g.\ ImageNet) for a different target task.
+\end{itemize}
+
+%------------------------------------------------------------
+\subsection{Data Augmentation}
+\label{sec:augmentation}
+%------------------------------------------------------------
+
+\begin{defbox}{Data Augmentation}
+Given a labelled image $(I, y)$ and a set of label-preserving transformations $\{A_l\}_l$, augmentation expands the training set by adding all $(A_l(I), y)$ pairs. This:
+\begin{enumerate}
+  \item Increases effective dataset size, reducing overfitting.
+  \item Encourages the network to become \emph{invariant} to those transformations.
+  \item Can address class imbalance by over-sampling minority classes.
+\end{enumerate}
+\end{defbox}
+
+\subsubsection{Types of Augmentation Transformations}
+
+\begin{tcolorbox}[colback=LightBlue,colframe=AccentBlue,boxrule=0.8pt,arc=3pt]
+\textbf{Geometric Transformations}
+\begin{itemize}
+  \item Random horizontal / vertical flip
+  \item Random rotation (e.g.\ $\pm72°$)
+  \item Random affine / perspective distortion, shear
+  \item Random crop / translation
+  \item Random scaling
+\end{itemize}
+\textbf{Photometric Transformations}
+\begin{itemize}
+  \item Gaussian noise injection
+  \item Brightness / contrast / saturation jitter (\texttt{ColorJitter})
+  \item Intensity shift / histogram manipulation
+  \item Image superimposition
+\end{itemize}
+\end{tcolorbox}
+
+\begin{warnbox}[Critical: augmentation must preserve the label]
+Not all transformations are valid for all tasks. Example: training a network to read clock times — rotating the image by 90° changes the time displayed, so rotation would corrupt the label. Always verify that the transformation preserves the discriminative information for your specific task.
+\end{warnbox}
+
+\begin{warnbox}[Hidden augmentation artefacts]
+If augmentation introduces systematic traces that correlate with class labels (e.g.\ blurring only images of one class, adding padding artefacts, changing colour statistics differently per class), the network will learn those artefacts as discriminative features rather than true semantic content. This causes brittle models that fail at test time without the artefact.
+\end{warnbox}
+
+\subsubsection{Mixup Augmentation}
+
+\term{Mixup} (Zhang et al., ICLR 2018) is a domain-agnostic augmentation technique that does not require specifying which geometric/photometric transformations are label-preserving:
+
+\begin{defbox}{Mixup}
+Given two training samples $(I_i, y_i)$ and $(I_j, y_j)$ (possibly from different classes), and $\lambda \sim \mathrm{Beta}(\alpha, \alpha)$ with $\lambda \in [0,1]$, define:
+\[
+\tilde{I} = \lambda I_i + (1-\lambda) I_j, \qquad \tilde{y} = \lambda y_i + (1-\lambda) y_j
+\]
+where $y_i, y_j$ are one-hot encoded class vectors. The virtual sample $(\tilde{I}, \tilde{y})$ is used as a training example. The loss (categorical cross-entropy) is computed against the soft label $\tilde{y}$.
+\end{defbox}
+
+\begin{insightbox}[Mixup intuition]
+Mixup extends the training distribution by encoding the prior belief that \emph{linear interpolations of feature vectors should correspond to linear interpolations of their labels}. This acts as a regulariser, discourages memorisation, and promotes smoother decision boundaries. It adds minimal computational overhead and requires no domain knowledge.
+\end{insightbox}
+
+\subsubsection{Test-Time Augmentation (TTA)}
+
+Even a perfectly augmented training regime does not achieve perfect invariance. \term{Test-Time Augmentation} (TTA) improves prediction accuracy at inference by:
+\begin{enumerate}
+  \item Generating multiple augmented versions $\{A_l(I)\}_l$ of the test image.
+  \item Running each through the CNN to get posterior vectors $\{p_l\}_l$.
+  \item Aggregating predictions: $\hat{p} = \mathrm{Avg}(\{p_l\})$.
+\end{enumerate}
+
+\begin{notebox}[TTA trade-offs]
+TTA can significantly improve accuracy, especially for uncertain predictions, but requires $n_{\text{aug}}$ forward passes instead of one. Class-specific augmentations cannot be used at test time (since the class is unknown). Best suited for high-stakes inference tasks where compute is not constrained.
+\end{notebox}
+
+\subsubsection{Augmentation in PyTorch}
+
+PyTorch implements augmentation \emph{within the DataLoader}, applying random transformations on-the-fly at each batch. This means the network never sees the exact same augmented image twice across epochs, and no augmented images need to be stored on disk.
+
+\begin{lstlisting}[caption={Stacking augmentation transforms in PyTorch}]
+from torchvision import transforms
+
+# Augmentation pipeline (applied only during training)
+augmentation = transforms.Compose([
+    transforms.RandomHorizontalFlip(p=0.5),
+    transforms.RandomVerticalFlip(p=0.5),
+    transforms.RandomAffine(degrees=0, translate=(0.2, 0.2)),
+    transforms.RandomRotation(degrees=72),
+    transforms.ColorJitter(brightness=0.5, contrast=0.75),
+])
+
+# Preprocessing only (applied at both train and test time)
+preprocess = transforms.Compose([
+    transforms.Resize((224, 224)),
+    transforms.CenterCrop(224),
+    transforms.Grayscale(),   # if needed
+])
+\end{lstlisting}
+
+%------------------------------------------------------------
+\subsection{Transfer Learning}
+\label{sec:transfer_learning}
+%------------------------------------------------------------
+
+\begin{defbox}{Transfer Learning}
+\term{Transfer learning} reuses a CNN pre-trained on a large source dataset (typically ImageNet) as a feature extractor for a new, smaller target dataset. The intuition: the convolutional layers of a well-trained FEN learn general-purpose visual features (edges, textures, shapes) that are useful for \emph{any} visual task, not just the source classification problem.
+\end{defbox}
+
+\subsubsection{Standard Transfer Learning Protocol}
+
+\begin{algobox}{Transfer Learning Steps}
+\begin{enumerate}
+  \item \textbf{Take} a powerful pre-trained CNN (e.g.\ ResNet, EfficientNet, MobileNet, VGG16).
+  \item \textbf{Remove} the original task-specific FC layers (the ``head'').
+  \item \textbf{Design} new FC layers matching the target task ($L_{\text{new}}$ output neurons).
+  \item \textbf{Freeze} the FEN weights (\texttt{requires\_grad = False} for all FEN parameters). The FEN acts as a fixed feature extractor.
+  \item \textbf{Train} only the new head on the (small) target training set.
+\end{enumerate}
+\end{algobox}
+
+\subsubsection{Transfer Learning vs.\ Fine-Tuning}
+
+\begin{tcolorbox}[colback=LightBlue,colframe=AccentBlue,boxrule=0.8pt,arc=3pt]
+\begin{tabular}{@{}p{0.22\linewidth}p{0.36\linewidth}p{0.34\linewidth}@{}}
+\toprule
+\textbf{Method} & \textbf{What is trained} & \textbf{When to use} \\
+\midrule
+Transfer Learning & New head only (FEN frozen) & Little data; source domain matches target \\
+Fine-Tuning & Whole network (FEN init.\ from pretrained) & More data available; source/target domains differ \\
+\bottomrule
+\end{tabular}
+\end{tcolorbox}
+
+\begin{insightbox}[Best practice: TL then fine-tune]
+A practical strategy: first train only the new head (TL) until it converges, then unfreeze the entire network and fine-tune with a \emph{lower learning rate} than used for the head. This avoids corrupting the pretrained FEN weights with noisy gradients from the randomly-initialised head.
+\end{insightbox}
+
+\subsubsection{Transfer Learning in PyTorch}
+
+\begin{lstlisting}[caption={Transfer learning with a pretrained model in PyTorch}]
+import torchvision.models as models
+import torch.nn as nn
+
+# Load pretrained model (weights from ImageNet)
+model = models.resnet50(pretrained=True)
+
+# Extract the feature extraction network (everything before the head)
+fen = model  # for ResNet, the head is model.fc
+
+# Freeze all FEN parameters
+for p in model.parameters():
+    p.requires_grad = False
+
+# Replace the classifier head for the new task (e.g., 6 classes)
+num_classes = 6
+model.fc = nn.Linear(model.fc.in_features, num_classes)
+# Only model.fc parameters have requires_grad=True
+
+# Train: only model.fc is updated
+optimizer = torch.optim.Adam(model.fc.parameters(), lr=1e-3)
+\end{lstlisting}
+
+\begin{warnbox}[Each pretrained model expects specific preprocessing]
+Every pretrained model was trained with a specific input normalisation (mean, std of ImageNet). Always apply the same preprocessing at inference. In \texttt{torchvision}, the \texttt{weights.transforms()} method returns the correct preprocessing pipeline.
+\end{warnbox}
+
+%------------------------------------------------------------
+\subsection{Performance Metrics: Confusion Matrix and ROC}
+%------------------------------------------------------------
+
+\begin{defbox}{Confusion Matrix}
+For a $K$-class problem, the confusion matrix $C \in \mathbb{R}^{K\times K}$ has entry $C(i,j)$ equal to the \emph{fraction of samples from class $i$ that were classified as class $j$}. The ideal confusion matrix is the identity (all diagonal, all off-diagonal zero).
+\end{defbox}
+
+\begin{defbox}{ROC Curve and AUC (Binary Classification)}
+In binary classification, the CNN output $p = \mathrm{CNN}(I) \in (0,1)$ is thresholded at $\Gamma$: predict class 1 if $p > \Gamma$. Varying $\Gamma$ traces the \term{Receiver Operating Characteristic (ROC)} curve, plotting True Positive Rate (TPR = sensitivity) against False Positive Rate (FPR = 1-specificity).\\
+The \textbf{Area Under the Curve (AUC)} summarises performance across all thresholds: AUC = 1 is perfect; AUC = 0.5 is random. The optimal operating point is the $\Gamma$ giving the point on the ROC curve closest to $(0,1)$.
+\end{defbox}
+
+\begin{insightbox}[Why use AUC instead of accuracy?]
+Accuracy depends on the threshold $\Gamma$ and is misleading for imbalanced datasets (a classifier predicting the majority class always gets high accuracy). AUC is threshold-independent and measures the probability that a randomly chosen positive example scores higher than a randomly chosen negative example — a true measure of ranking quality.
+\end{insightbox}
+
+%=========================================================
+\section{Famous CNN Architectures}
+\label{sec:famous_archs}
+%=========================================================
+
+\subsection{AlexNet (2012): The Deep Learning Revolution}
+
+\term{AlexNet} (Krizhevsky, Sutskever, Hinton, NIPS 2012) won the ImageNet Large Scale Visual Recognition Challenge (ILSVRC) 2012 by a dramatic margin ($\sim$10 percentage points), marking the beginning of the deep learning era in computer vision.
+
+\begin{defbox}{AlexNet Architecture}
+\textbf{Input:} $224\times224\times3$ (RGB).\\
+\textbf{Structure:} 5 convolutional layers (large filters: $11\times11$, $5\times5$) + 3 fully-connected layers.\\
+\textbf{Parameters:} $\sim$60 million. Conv: 3.7M (6\%); FC: 58.6M (94\%).\\
+\textbf{Key innovations:}
+\begin{itemize}
+  \item \textbf{ReLU activations} (faster training, no vanishing gradient for positive activations).
+  \item \textbf{Dropout} (0.5) in FC layers to prevent overfitting.
+  \item \textbf{Max-pooling} instead of average-pooling.
+  \item Trained on 2 GTX 580 GPUs in parallel (5–6 days, 90 epochs).
+  \item Ensemble of 7 models reduced top-5 error: 18.2\% $\to$ 15.4\%.
+\end{itemize}
+\end{defbox}
+
+\begin{insightbox}[AlexNet's historical significance]
+AlexNet's 2012 victory was not just a marginal improvement — it \emph{shocked} the computer vision community, which had not expected a neural network to outperform carefully hand-crafted feature pipelines (e.g.\ HOG+SVM). It triggered a paradigm shift: virtually all competitive vision systems switched to deep CNNs within 2–3 years.
+\end{insightbox}
+
+%------------------------------------------------------------
+\subsection{VGG16 (2014): Going Deeper with Small Filters}
+\label{sec:vgg}
+%------------------------------------------------------------
+
+\term{VGG16} (Simonyan \& Zisserman, ICLR 2015) won 1st place (localisation) and 2nd place (classification) in ILSVRC 2014. Its key insight: \emph{replace large filters with stacks of small $3\times3$ filters}.
+
+\begin{defbox}{VGG16 Architecture}
+\textbf{Input:} $224\times224\times3$.\\
+\textbf{Structure:} 13 convolutional layers (all $3\times3$, stride 1) grouped in blocks, each block followed by $2\times2$ max-pooling. Ends with 3 FC layers (4096, 4096, 1000).\\
+\textbf{Parameters:} $\sim$138 million. Conv: 11\% ($\approx$15M); FC: 89\% ($\approx$123M, mostly \texttt{fc1}: 102M).\\
+\textbf{Memory:} $\sim$100 MB per image for forward activations; $\sim$200 MB during training (backward pass).
+\end{defbox}
+
+\subsubsection{Why Small Filters?}
+
+\begin{tcolorbox}[colback=LightBlue,colframe=AccentBlue,boxrule=0.8pt,arc=3pt]
+\textbf{Three $3\times3$ convolutions vs.\ one $7\times7$ convolution:}\\[4pt]
+\begin{tabular}{@{}lcc@{}}
+\toprule
+\textbf{Property} & \textbf{$3\times$ Conv($3\times3$)} & \textbf{$1\times$ Conv($7\times7$)} \\
+\midrule
+Receptive field & $7\times7$ & $7\times7$ \\
+Filter parameters (single channel) & $3\times3\times3 = 27$ & $7\times7 = 49$ \\
+Nonlinearities applied & 3 & 1 \\
+\bottomrule
+\end{tabular}\\[6pt]
+\textit{Same receptive field, fewer parameters, more nonlinearities.}
+\end{tcolorbox}
+
+\begin{insightbox}[The deep-and-narrow principle]
+VGG demonstrates that depth is more effective than large filter size. Multiple stacked small filters achieve the same receptive field as a single large filter while requiring fewer parameters and introducing more nonlinearity. This principle guides most modern architecture design.
+\end{insightbox}
+
+\begin{warnbox}[VGG limitations]
+VGG's 138M parameters are mostly in the 3 FC layers. This makes it very memory-hungry and inference-expensive. Despite its conceptual elegance, it is largely superseded by more parameter-efficient architectures (ResNet, EfficientNet) in practice.
+\end{warnbox}
+
+%------------------------------------------------------------
+\subsection{CNN Visualisation}
+\label{sec:cnn_viz}
+%------------------------------------------------------------
+
+Understanding \emph{what} a CNN has learned is important both for interpretability and for building better models.
+
+\subsubsection{Visualising First-Layer Filters}
+
+The first convolutional layer filters are $3\times3$ or $11\times11$ RGB tensors, directly visualisable as images. In AlexNet, first-layer filters resemble Gabor-like edge detectors and colour blob detectors — consistent with V1 neurons in the visual cortex.
+
+\begin{insightbox}[Template matching interpretation]
+A convolutional filter $w$ applied to image $I$ produces a large activation at position $(r,c)$ when the patch of $I$ centered at $(r,c)$ is similar (high dot product) to the filter $w$ itself. Visualising the filter is equivalent to visualising the ``template'' the neuron responds maximally to.
+\end{insightbox}
+
+\subsubsection{Maximally Activating Patches}
+
+For deeper layers, direct filter visualisation is not meaningful (filters operate on high-dimensional abstract volumes). Instead:
+\begin{enumerate}
+  \item Select a specific neuron in a deep layer.
+  \item Feed all training images through the network, recording activations.
+  \item Identify images with the highest activation.
+  \item Display the patch of the input image corresponding to the neuron's receptive field.
+\end{enumerate}
+\textit{Result:} early layers respond to fine low-level patterns; intermediate layers respond to textures and parts; deep layers respond to high-level semantic content (faces, wheels, text).
+
+\subsubsection{Gradient Ascent: Synthesising Maximally Activating Inputs}
+
+\begin{defbox}{Gradient Ascent for Neuron Visualisation}
+To find the input $\hat{I}$ that maximally activates a target neuron (or class score $S_c$):
+\[
+\hat{I} = \arg\max_{I}\; S_c(I) + \lambda \|I\|_2^2
+\]
+Starting from a random or zero image, iteratively update $I$ in the direction of $\nabla_I S_c(I)$ (gradient ascent). The regulariser $\lambda\|I\|_2^2$ encourages smooth, natural-looking images.
+\end{defbox}
+
+\begin{insightbox}[Hierarchical feature learning]
+Gradient ascent visualisations confirm the hierarchy: neurons in early layers synthesise oriented gratings and colour patches; neurons in intermediate layers synthesise textures; neurons in deep layers synthesise object-like patterns. This is visual evidence that CNNs genuinely learn a hierarchy of translation-invariant spatial pattern detectors.
+\end{insightbox}
+
+%------------------------------------------------------------
+\subsection{Network in Network (NiN, 2014): GAP and 1\texttimes1 Convolutions}
+\label{sec:nin}
+%------------------------------------------------------------
+
+\term{Network in Network} (Lin, Chen, Yan, ICLR 2014) introduced two ideas that became foundational in modern architectures.
+
+\subsubsection{MLPConv Layers}
+
+Instead of a standard conv layer (linear combination + activation), NiN uses a \emph{small MLP} (1-2 hidden layers with ReLU) applied at each spatial position:
+\[
+\text{Conv:} \quad f = \mathrm{ReLU}\!\left(\sum_i w_i x_i + b\right), \qquad
+\text{MLPConv:} \quad f = \mathrm{ReLU}\!\left(\sum_i w_i^{(1)}\mathrm{ReLU}\!\left(\sum_j w_j^{(2)} x_j + b^{(2)}\right) + b^{(1)}\right)
+\]
+This is equivalent to $1\times1$ convolutions (see below), applied in a sliding fashion. It provides a richer functional approximation than a single linear layer.
+
+\subsubsection{$1\times1$ Convolutions as Bottlenecks}
+
+A \textbf{$1\times1$ convolutional layer} takes each spatial position $(r,c)$ independently and applies a learned linear combination across \emph{all channels}. It:
+\begin{itemize}
+  \item Does not affect spatial dimensions.
+  \item Can \emph{reduce or increase} the number of channels (depth).
+  \item Introduces nonlinearity (via activation after the $1\times1$ conv).
+  \item Is computationally very cheap compared to $3\times3$ or $5\times5$ convolutions.
+\end{itemize}
+Used as a \term{bottleneck}: inserting a $1\times1$ conv \emph{before} an expensive $3\times3$ or $5\times5$ conv reduces the number of input channels and dramatically cuts computation.
+
+\subsubsection{Global Average Pooling (GAP)}
+
+\begin{defbox}{Global Average Pooling (GAP)}
+Given a volume of shape $H \times W \times C$, GAP collapses the spatial dimensions by averaging each channel:
+\[
+F_k = \frac{1}{H\cdot W}\sum_{(x,y)} f_k(x,y), \quad k=1,\ldots,C
+\]
+Output shape: $C$ (a vector, one scalar per channel). This replaces flattening + dense layers at the end of the network.
+\end{defbox}
+
+\begin{tcolorbox}[colback=LightBlue,colframe=AccentBlue,boxrule=0.8pt,arc=3pt]
+\textbf{Advantages of GAP over FC after flattening:}
+\begin{itemize}
+  \item \textbf{No trainable parameters} — cannot overfit; acts as structural regulariser.
+  \item \textbf{Size-agnostic inputs:} the network can classify images of \emph{any resolution} (the spatial sum adapts).
+  \item \textbf{Shift invariance:} spatial shifts in the input produce shifted feature maps but the \emph{same average} → GAP is inherently shift-invariant. FC after flattening is not (different neurons see different spatial positions).
+  \item \textbf{Interpretability:} enables Class Activation Mapping (CAM) for weakly-supervised localisation.
+\end{itemize}
+\end{tcolorbox}
+
+\begin{lstlisting}[caption={GAP layer in Keras}]
+gap = tf.keras.layers.GlobalAveragePooling2D(name='gap')(x)
+# Output shape: (batch_size, num_channels)
+# Followed directly by Dense(num_classes, activation='softmax')
+\end{lstlisting}
+
+\begin{insightbox}[GAP increases invariance to spatial shifts: a key exam point]
+An MLP after flattening connects \emph{specific spatial positions} to output neurons — if an object is shifted, completely different neurons fire. GAP aggregates over all positions, so a shifted object produces the same (or very similar) average feature vector. This makes GAP-based networks much more robust to spatial misalignment, which is common in real-world images.
+\end{insightbox}
+
+%------------------------------------------------------------
+\subsection{GoogLeNet / Inception v1 (2014): Multi-Scale Branches}
+\label{sec:inception}
+%------------------------------------------------------------
+
+\term{GoogLeNet} (Szegedy et al., CVPR 2015) won ILSVRC 2014 classification with only 5M parameters — 12$\times$ fewer than AlexNet — while being deeper (22 layers of inception modules).
+
+\subsubsection{Motivation: Features at Multiple Scales}
+
+Objects in natural images appear at widely varying scales. A fixed filter size (say $3\times3$) may be too small for a large object or too large for fine-grained details. The solution: run multiple filter sizes \emph{in parallel} and let the network decide which to attend to.
+
+\subsubsection{Inception Module}
+
+\begin{defbox}{Inception Module (v1)}
+At each Inception block, four parallel branches operate on the same input volume:
+\begin{enumerate}
+  \item $1\times1$ conv (captures fine-grained, local patterns)
+  \item $1\times1$ bottleneck $\to$ $3\times3$ conv (medium-scale features)
+  \item $1\times1$ bottleneck $\to$ $5\times5$ conv (large-scale features)
+  \item $3\times3$ max-pool $\to$ $1\times1$ conv (pooled features)
+\end{enumerate}
+All branches use zero-padding to preserve the spatial size. Outputs are \textbf{concatenated along the channel dimension}: $\mathrm{output} = \mathrm{concat}([b_1, b_2, b_3, b_4], \text{axis}=\mathrm{channel})$.
+\end{defbox}
+
+The $1\times1$ bottlenecks are essential: without them, computing $5\times5$ convs on a 480-channel input costs 854M operations; with them, the cost drops to 358M.
+
+\begin{lstlisting}[caption={Simplified Inception module in Keras}]
+# Input tensor x of shape (H, W, C)
+x1 = tf.keras.layers.Conv2D(32, kernel_size=1, padding='same',
+                             activation='relu', name='conv_1x1')(x)
+x2 = tf.keras.layers.Conv2D(64, kernel_size=1, padding='same',
+                             activation='relu', name='bottleneck_3x3')(x)
+x2 = tf.keras.layers.Conv2D(128, kernel_size=3, padding='same',
+                             activation='relu', name='conv_3x3')(x2)
+x3 = tf.keras.layers.Conv2D(16, kernel_size=1, padding='same',
+                             activation='relu', name='bottleneck_5x5')(x)
+x3 = tf.keras.layers.Conv2D(32, kernel_size=5, padding='same',
+                             activation='relu', name='conv_5x5')(x3)
+x4 = tf.keras.layers.MaxPooling2D((3,3), strides=(1,1),
+                                   padding='same', name='mp_branch')(x)
+x4 = tf.keras.layers.Conv2D(32, kernel_size=1, padding='same',
+                             activation='relu', name='conv_after_pool')(x4)
+# Concatenate all branches along the channel axis
+y = tf.keras.layers.Concatenate(axis=-1, name='concat')([x1, x2, x3, x4])
+\end{lstlisting}
+
+\begin{insightbox}[3 take-home messages from GoogLeNet]
+\begin{enumerate}
+  \item \textbf{Parallel branches:} process the same input at multiple scales simultaneously and merge by concatenation.
+  \item \textbf{$1\times1$ convolutions as bottlenecks:} reduce channel depth before expensive spatial convolutions to dramatically cut computation and parameters.
+  \item \textbf{Auxiliary losses:} intermediate classification heads attached to intermediate layers are trained jointly. This injects gradient signal into early layers, combating vanishing gradients. These auxiliary heads are discarded at inference.
+\end{enumerate}
+\end{insightbox}
+
+\subsubsection{GoogLeNet Architecture Details}
+
+GoogLeNet stacks \textbf{27 layers} total (including pooling layers), structured as:
+\begin{enumerate}
+  \item Two initial blocks of conv + pooling layers (traditional processing).
+  \item \textbf{Nine Inception modules} stacked sequentially.
+  \item No fully-connected layers: a GAP layer feeds directly into a linear classifier + softmax.
+\end{enumerate}
+Total trainable parameters: \textbf{only 5M} — 12$\times$ fewer than AlexNet (60M) despite being deeper.
+
+\textbf{Auxiliary classifiers.} GoogLeNet also suffers from vanishing gradients at training time. To address this, two \textbf{auxiliary classification heads} are attached to intermediate feature representations. These produce additional losses used only during training (weighted at 0.3 each); they are removed at inference. The motivation: you expect intermediate representations to already carry meaningful classification information.
+
+\begin{lstlisting}[language=Python, caption={Inception module in PyTorch (simplified)}]
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+# x: input tensor of shape (N, C_in, H, W)
+x = nn.MaxPool2d(kernel_size=2, stride=2, padding=1)(x)
+
+# Branch 1: 1x1 conv
+x1 = nn.Conv2d(C_in, 32, kernel_size=1, padding=0)(x)
+x1 = F.relu(x1)
+
+# Branch 2: 1x1 conv
+x2 = nn.Conv2d(C_in, 64, kernel_size=1, padding=0)(x)
+x2 = F.relu(x2)
+
+# Branch 3: max-pool, spatial dim preserved (stride=1, padding=1)
+x3 = nn.MaxPool2d(kernel_size=3, stride=1, padding=1)(x)
+
+# Concatenate branches along the channel dimension (dim=1 in PyTorch)
+y = torch.cat([x1, x2, x3], dim=1)
+\end{lstlisting}
+
+\begin{warnbox}[PyTorch Inception implementation pitfalls]
+\begin{itemize}
+  \item All branches must produce tensors of the \textbf{same spatial size} before concatenation. Use \texttt{padding=1} and \texttt{stride=1} in max-pool branches.
+  \item Concatenation is along \texttt{dim=1} (channel axis) in PyTorch's $(N,C,H,W)$ convention — this is \texttt{axis=-1} in Keras's $(N,H,W,C)$ convention.
+  \item CNNs with inception modules are no longer sequential: they require parallel processing and explicit concatenation — use PyTorch's functional API rather than \texttt{nn.Sequential}.
+\end{itemize}
+\end{warnbox}
+
+%------------------------------------------------------------
+\subsection{ResNet (2015): Residual Learning}
+\label{sec:resnet}
+%------------------------------------------------------------
+
+\term{ResNet} (He et al., CVPR 2016) introduced \term{residual connections} (skip connections), enabling networks of 152+ layers. It won ILSVRC 2015 with 3.57\% top-5 error — surpassing human-level performance on ImageNet.
+
+\subsubsection{The Degradation Problem}
+
+Empirically, adding more layers to a network \emph{beyond a certain depth} increases \emph{both} training and test error — this cannot be explained by overfitting (which would decrease training error while increasing test error). It indicates an \textbf{optimisation problem}: deeper networks are harder to train, not less expressive.
+
+\begin{insightbox}[Why deeper should not be worse]
+Theoretically, a deeper network could always match a shallower one: just copy the shallow network's weights into the first layers and set all extra layers to learn identity mappings. The empirical failure to do so reveals that \emph{learning the identity function is hard for standard conv layers}. Residual connections solve this by making the identity the ``default'' path.
+\end{insightbox}
+
+\subsubsection{Residual Block}
+
+\begin{defbox}{Residual Block}
+Instead of learning a direct mapping $\mathcal{H}(\mathbf{x})$, the block learns the \term{residual}:
+\[
+\mathcal{F}(\mathbf{x}) = \mathcal{H}(\mathbf{x}) - \mathbf{x}
+\]
+The full mapping is implemented as:
+\[
+\text{output} = \mathcal{F}(\mathbf{x}) + \mathbf{x}
+\]
+where $\mathcal{F}(\mathbf{x})$ is the result of 2 (or 3) conv layers, and $\mathbf{x}$ is the \term{identity shortcut connection} that bypasses them.\\
+If the extra layers are not beneficial, $\mathcal{F}(\mathbf{x}) \to 0$ (weights go to zero), and the block reduces to identity.\\
+\textbf{Constraints:} $\mathbf{x}$ and $\mathcal{F}(\mathbf{x})$ must have the same shape. If dimensions differ (e.g.\ after spatial downsampling or changing channel count), a $1\times1$ conv on the shortcut adjusts dimensions.
+\end{defbox}
+
+\begin{lstlisting}[caption={Residual block in Keras (same spatial size, same channels)}]
+# Input x; filters = number of filters; name = block identifier
+s1 = tf.keras.layers.Conv2D(filters=filters, kernel_size=3,
+        padding='same', activation='relu', name='conv_'+name+'_1')(x)
+s2 = tf.keras.layers.Conv2D(filters=filters, kernel_size=3,
+        padding='same', activation=None,  name='conv_'+name+'_2')(s1)
+# Skip connection: add input directly (same spatial size & channels)
+s3 = tf.keras.layers.Add(name='add_'+name)([x, s2])
+s4 = tf.keras.layers.ReLU(name='relu_'+name)(s3)
+# Spatial downsampling happens OUTSIDE the residual block
+s5 = tf.keras.layers.MaxPooling2D(name='pool_'+name)(s4)
+\end{lstlisting}
+
+\begin{warnbox}[ResNet implementation details]
+\begin{itemize}
+  \item Spatial size must \emph{not} change within a residual block (padding='same', stride=1 in conv layers). Downsampling goes outside the block.
+  \item The ReLU activation is applied \emph{after} the addition $\mathcal{F}(\mathbf{x}) + \mathbf{x}$, not before.
+  \item Channel dimensionality must match between the skip connection and $\mathcal{F}(\mathbf{x})$. Use $1\times1$ conv on the skip path to adjust if necessary.
+\end{itemize}
+\end{warnbox}
+
+\subsubsection{Bottleneck Residual Block}
+
+For very deep networks (ResNet-50/101/152), a \term{bottleneck block} reduces computation:
+\begin{enumerate}
+  \item $1\times1$ conv: reduces channels (e.g.\ 256 $\to$ 64).
+  \item $3\times3$ conv: spatial processing (on the reduced channels).
+  \item $1\times1$ conv: restores channels (64 $\to$ 256).
+\end{enumerate}
+This achieves the same representational power with $\sim3\times$ fewer operations than two $3\times3$ convs on the full channel count.
+
+\subsubsection{ResNet Architecture}
+
+ResNet uses:
+\begin{itemize}
+  \item One initial conv + batch-norm + ReLU + max-pool layer.
+  \item 4 stages of residual blocks, each stage doubling channels and halving spatial size (via strided conv on the first block of each stage).
+  \item Global Average Pooling instead of FC layers.
+  \item Final softmax classifier.
+\end{itemize}
+
+\begin{insightbox}[Why residual connections work — deeper insights]
+The identity shortcut enables gradients to flow directly from the loss back to early layers without passing through potentially saturated activations. It effectively creates an \emph{ensemble of shallower networks} implicit in the residual structure, each using a different subset of layers. Empirically, the learned residuals are small (the network is close to identity in most blocks), suggesting that most layers are fine-tuning the representation rather than transforming it drastically.
+\end{insightbox}
+
+\subsubsection{ResNet Scale and Results}
+
+He et al.\ trained networks of unprecedented depth:
+\begin{itemize}
+  \item \textbf{ResNet-152} on ImageNet: 152 layers, \textbf{3.57\% top-5 error} — surpassing estimated human performance ($\sim$5\%). Won ILSVRC 2015 both classification and localisation tracks.
+  \item \textbf{ResNet-1202} on CIFAR-10: 1202 layers, demonstrating that residual training remains stable even at this extreme depth (though accuracy did not improve further beyond ResNet-110, suggesting optimisation is not the only bottleneck at that scale).
+\end{itemize}
+
+\subsubsection{ResNet Block in PyTorch}
+
+\begin{lstlisting}[language=Python, caption={Residual block in PyTorch}]
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+residual = x  # save input for skip connection
+
+# Both conv layers preserve spatial dimensions (padding=1, stride=1)
+s1 = nn.Conv2d(C, C, kernel_size=3, padding=1)(x)
+s1 = F.relu(s1)
+s2 = nn.Conv2d(C, C, kernel_size=3, padding=1)(s1)
+# NOTE: do NOT apply ReLU to s2 before the addition
+
+# Skip connection: element-wise addition
+s3 = torch.add(residual, s2)
+
+# Apply non-linearity AFTER the addition
+s4 = F.relu(s3)
+
+# Spatial downsampling happens OUTSIDE the residual block
+s5 = nn.MaxPool2d(kernel_size=2, stride=2)(s4)
+\end{lstlisting}
+
+\begin{warnbox}[PyTorch ResNet implementation details]
+\begin{itemize}
+  \item Spatial size must \textbf{not} change within a residual block: use \texttt{padding=1, stride=1} in both conv layers. Downsampling (stride 2 or MaxPool) goes \emph{outside} the block.
+  \item Apply ReLU \textbf{after} the \texttt{torch.add} — not between the two conv layers and the addition.
+  \item If the skip path and $\mathcal{F}(\mathbf{x})$ differ in channel count (e.g.\ after changing the number of filters), add a $1\times1$ conv on the skip path to match dimensions.
+\end{itemize}
+\end{warnbox}
+
+%------------------------------------------------------------
+\subsection{MobileNet (2017): Efficient Inference}
+\label{sec:mobilenet}
+%------------------------------------------------------------
+
+\term{MobileNet} (Howard et al., arXiv 2017) is designed for deployment on mobile and embedded devices with constrained compute and memory. Its key idea: replace standard Conv2D with \term{depthwise separable convolutions}.
+
+\subsubsection{Depthwise Separable Convolution}
+
+A standard $k\times k$ convolution on a $D_F \times D_F \times M$ input producing $N$ output channels requires $D_K^2 \cdot M \cdot D_F^2 \cdot N$ operations. Depthwise separable convolution splits this into two steps:
+
+\begin{defbox}{Depthwise Separable Convolution}
+\begin{enumerate}
+  \item \textbf{Depthwise convolution:} apply one $k\times k$ filter per input channel independently (no cross-channel mixing). Cost: $D_K^2 \cdot M \cdot D_F^2$.
+  \item \textbf{Pointwise convolution:} apply $N$ filters of size $1\times1$ across all channels to mix channel information. Cost: $M \cdot D_F^2 \cdot N$.
+\end{enumerate}
+\textbf{Total cost:} $D_K^2 \cdot M \cdot D_F^2 + M \cdot D_F^2 \cdot N = D_F^2 M (D_K^2 + N)$
+\end{defbox}
+
+\subsubsection{Computational Saving}
+
+\[
+\frac{\text{Depthwise Separable cost}}{\text{Standard Conv cost}} = \frac{D_K^2 + N}{D_K^2 \cdot N} = \frac{1}{N} + \frac{1}{D_K^2}
+\]
+
+For $D_K = 3$ and $N = 256$: saving factor $\approx 1/9 \approx 8\times$ fewer operations with minimal accuracy loss.
+
+\begin{insightbox}[Intuition behind depthwise separable convolution]
+Standard convolution conflates two operations: (1) spatial feature detection within each channel, and (2) cross-channel feature combination. Depthwise separable convolution disentangles these: the depthwise step does spatial filtering per channel, and the pointwise step combines channels. This factorisation preserves most of the representational power at a fraction of the cost.
+\end{insightbox}
+
+%------------------------------------------------------------
+\subsection{Architecture Comparison}
+\label{sec:arch_comparison}
+%------------------------------------------------------------
+
+\subsubsection{ILSVRC Historical Timeline}
+
+The ImageNet Large Scale Visual Recognition Challenge (ILSVRC) drove a decade of CNN architecture innovation. The top-5 classification error dropped from $>25\%$ in the pre-deep-learning era to below human performance by 2015:
+
+\begin{tcolorbox}[colback=NoteGrayBg,colframe=NoteGray,boxrule=0.8pt,arc=3pt]
+\textbf{CNN Architecture Timeline}\\[4pt]
+\begin{tabular}{@{}llp{0.55\linewidth}@{}}
+\toprule
+\textbf{Year} & \textbf{Architecture} & \textbf{Key contribution} \\
+\midrule
+1998 & LeNet-5       & First CNN; conv + pool + FC pipeline \\
+2012 & AlexNet       & Deep learning revival; ReLU, dropout, GPU \\
+2013 & VGG           & Depth with small ($3\times3$) filters \\
+2014 & NiN           & $1\times1$ convs; GAP replacing FC \\
+2014 & GoogLeNet     & Inception modules; multi-scale parallel branches \\
+2015 & ResNet        & Residual connections; 152 layers; superhuman accuracy \\
+2017 & MobileNet     & Depthwise separable convolutions for mobile devices \\
+2019 & EfficientNet  & Compound scaling of depth/width/resolution \\
+\bottomrule
+\end{tabular}
+\end{tcolorbox}
+
+\begin{tcolorbox}[colback=LightBlue,colframe=AccentBlue,boxrule=0.8pt,arc=3pt]
+\textbf{Landmark CNN Architectures: Summary}\\[4pt]
+\begin{tabular}{@{}lrrrp{0.35\linewidth}@{}}
+\toprule
+\textbf{Model} & \textbf{Year} & \textbf{Params} & \textbf{ILSVRC top-5} & \textbf{Key innovation} \\
+\midrule
+LeNet-5     & 1998 & 61K    & -- & First CNN; conv+pool+FC \\
+AlexNet     & 2012 & 60M    & 15.4\% & ReLU, dropout, GPU training \\
+VGG16       & 2014 & 138M   & 7.3\%  & Deep + small ($3\times3$) filters \\
+GoogLeNet   & 2014 & 5M     & 6.7\%  & Inception modules, GAP, aux.\ losses \\
+ResNet-152  & 2015 & 60M    & 3.57\% & Residual connections \\
+MobileNet   & 2017 & 4.2M   & --     & Depthwise separable conv \\
+\bottomrule
+\end{tabular}
+\end{tcolorbox}
+
+\begin{insightbox}[VGGs are least efficient; Inception/ResNet are best]
+VGG's huge FC layers make it memory- and compute-hungry despite moderate depth. GoogLeNet achieves competitive accuracy with 27$\times$ fewer parameters than AlexNet. ResNet achieves superhuman performance by exploiting residual connections. MobileNet / EfficientNet prioritise computational efficiency for edge deployment.
+\end{insightbox}
+
+\subsubsection{Accuracy–Efficiency Trade-off (Canziani et al., 2016)}
+
+Beyond top-5 error, a practical architecture comparison must consider \textbf{computational cost} (ops/image) and \textbf{memory footprint} (parameters). Canziani et al.\ plot accuracy vs.\ operations per image, with bubble size encoding parameter count:
+
+\begin{tcolorbox}[colback=LightBlue,colframe=AccentBlue,boxrule=0.8pt,arc=3pt]
+\textbf{Key takeaways from the accuracy vs.\ ops/image plot:}
+\begin{itemize}
+  \item \textbf{VGG} (VGG-16, VGG-19): very high ops/image and parameter count — the \emph{least efficient} family despite decent accuracy.
+  \item \textbf{AlexNet}: lowest accuracy and not particularly efficient — the weakest option on both axes.
+  \item \textbf{Inception models}: best accuracy-to-efficiency ratio. \textbf{Inception-v4} explicitly combines ResNet residual connections with Inception modules, achieving the best overall performance.
+  \item \textbf{ResNet}: excellent accuracy scaling; the standard backbone for transfer learning.
+  \item \textbf{MobileNet} and \textbf{SqueezeNet}: designed specifically for maximising efficiency — low ops/image and few parameters, at some cost in accuracy. Ideal for mobile/embedded deployment.
+\end{itemize}
+\end{tcolorbox}
+
+\subsubsection{Inspecting Architecture Parameter Counts}
+
+When building or loading a model, always verify the parameter count before training:
+
+\begin{lstlisting}[language=Python, caption={Inspecting model parameters in PyTorch and Keras}]
+# --- PyTorch ---
+total     = sum(p.numel() for p in model.parameters())
+trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
+print(f"Total params: {total:,}  |  Trainable: {trainable:,}")
+
+# --- Keras ---
+model.summary()   # prints layer-by-layer output shape + param count
+\end{lstlisting}
+
+\begin{notebox}[What to check in model.summary()]
+For each layer: output shape (to verify spatial dimensions are preserved/reduced as intended) and parameter count. For BatchNorm2d with $C$ channels: 4$C$ total params ($2C$ trainable $\gamma,\beta$ + $2C$ non-trainable running mean/var). For a Conv2d with $k\times k$ kernel, $C_{in}$ input channels, $C_{out}$ output channels: $k^2 \cdot C_{in} \cdot C_{out} + C_{out}$ params (weights + biases).
+\end{notebox}
+
+%------------------------------------------------------------
+\subsection{ResNeXt, Wide ResNet, and DenseNet: Variations}
+\label{sec:resnet_variants}
+%------------------------------------------------------------
+
+\subsubsection{Wide ResNet}
+
+Instead of making the network deeper, \term{Wide ResNet} makes it \emph{wider}: multiply the number of filters in each block by a factor $k$ (width multiplier). A 50-layer wide ResNet with $k=2$ outperforms the 152-layer original ResNet. Wider networks are also easier to parallelise on GPUs.
+
+\subsubsection{ResNeXt}
+
+\term{ResNeXt} (Xie et al., CVPR 2017) combines the ideas of residual learning (ResNet) and parallel branches (Inception). Each residual block is replaced by multiple parallel paths of the same topology:
+\[
+\text{output} = \mathbf{x} + \sum_{i=1}^{C} \mathcal{T}_i(\mathbf{x})
+\]
+where $C$ is the \emph{cardinality} (number of parallel paths) and each $\mathcal{T}_i$ is a bottleneck transform. Unlike Inception, all paths share the same topology (no expert design needed). Increasing cardinality is more effective than increasing width or depth at the same parameter budget.
+
+\subsubsection{DenseNet}
+
+\term{DenseNet} (Huang et al., CVPR 2017) takes skip connections to the extreme: \emph{every layer receives feature maps from all preceding layers within a dense block}:
+\[
+\mathbf{x}_l = H_l([\mathbf{x}_0, \mathbf{x}_1, \ldots, \mathbf{x}_{l-1}])
+\]
+where $[\cdot]$ denotes concatenation along the channel axis. Benefits:
+\begin{itemize}
+  \item Alleviates vanishing gradients (direct gradient paths to all layers).
+  \item Promotes feature reuse (each layer has access to all earlier features).
+  \item Reduces the number of parameters (features are reused, not recomputed).
+\end{itemize}
+Transition layers (conv + pool) between dense blocks reduce spatial size and channel count.
+
+%------------------------------------------------------------
+\subsection{EfficientNet (2019): Compound Scaling}
+\label{sec:efficientnet}
+%------------------------------------------------------------
+
+\term{EfficientNet} (Tan \& Le, ICML 2019) introduces \term{compound scaling}: simultaneously and uniformly scaling network \emph{depth}, \emph{width}, and \emph{input resolution} using a single compound coefficient $\phi$:
+\[
+\text{depth:}\; d = \alpha^\phi, \quad \text{width:}\; w = \beta^\phi, \quad \text{resolution:}\; r = \gamma^\phi, \quad \text{s.t.}\; \alpha \cdot \beta^2 \cdot \gamma^2 \approx 2
+\]
+The base network (EfficientNet-B0) is found by neural architecture search (NAS), and the $\alpha, \beta, \gamma$ coefficients are determined empirically. EfficientNet-B7 achieves state-of-the-art accuracy with an order of magnitude fewer parameters than comparable ResNets.
+
+\begin{insightbox}[Why compound scaling?]
+Intuitively: larger input resolutions require deeper networks (larger receptive fields) and wider networks (more channels to capture fine details). Scaling only one dimension at a time is suboptimal. Compound scaling finds the right balance, matching the available compute budget while maximising accuracy.
+\end{insightbox}
+
+%------------------------------------------------------------
+\subsection{Recap: Design Principles Across All Architectures}
+%------------------------------------------------------------
+
+\begin{tcolorbox}[colback=WarningRedBg,colframe=WarningRed,boxrule=0.8pt,arc=3pt]
+\textbf{Key Design Principles (Exam Summary)}
+\begin{enumerate}
+  \item \textbf{Depth beats width} (at the same parameter budget): more layers $\to$ larger receptive field, more abstraction.
+  \item \textbf{Small filters, stacked} ($3\times3$): same receptive field as large filters with fewer parameters and more nonlinearities (VGG).
+  \item \textbf{$1\times1$ convolutions as bottlenecks}: cheap channel mixing and dimensionality reduction (GoogLeNet, ResNet bottleneck, MobileNet pointwise).
+  \item \textbf{Skip/residual connections}: facilitate gradient flow and make identity the default mapping, enabling very deep networks (ResNet, DenseNet).
+  \item \textbf{GAP over FC}: reduces parameters, improves shift invariance, enables variable-size inputs (NiN, GoogLeNet, ResNet).
+  \item \textbf{Parallel branches}: capture multi-scale features simultaneously (Inception).
+  \item \textbf{Depthwise separable convolutions}: factorised computation for mobile/edge deployment (MobileNet, EfficientNet).
+\end{enumerate}
+\end{tcolorbox}
+
+%=========================================================
+\section{CNN for Localisation, Weakly Supervised Localisation, and Explainability}
+\label{sec:lecture10}
+%=========================================================
+
+%------------------------------------------------------------
+\subsection{Data Pre-processing and Batch Normalisation}
+%------------------------------------------------------------
+
+\subsubsection{Why Pre-processing Matters}
+
+Gradient-based optimisers work best when the data live in a well-conditioned region of input space. Normalisation achieves two goals:
+\begin{itemize}
+  \item \textbf{Centring}: brings the distribution close to the origin, removing constant offsets that the optimiser would otherwise have to absorb into the weights.
+  \item \textbf{Rescaling}: makes each input dimension comparable in magnitude, producing a more isotropic loss landscape and, in practice, faster convergence with less sensitivity to the initial learning rate.
+\end{itemize}
+
+\subsubsection{Pre-processing Strategies for CNNs}
+
+PCA whitening is uncommon for CNNs — its cost is prohibitive on raw images and the per-channel statistics approach works well in practice. The three standard strategies, illustrated by landmark architectures:
+
+\begin{tcolorbox}[colback=LightBlue,colframe=AccentBlue,boxrule=0.8pt,arc=3pt]
+\textbf{CNN Pre-processing: Common Choices}\\[4pt]
+\begin{tabular}{@{}lp{0.72\linewidth}@{}}
+\toprule
+\textbf{Model} & \textbf{Pre-processing} \\
+\midrule
+AlexNet & Subtract the \emph{mean image} — a full $32\times32\times3$ array (one mean value per pixel and channel). \\
+VGG     & Subtract the \emph{per-channel mean} (three scalars, one per colour channel). \\
+ResNet  & Subtract the per-channel mean \emph{and} divide by the per-channel std (six scalars). \\
+\bottomrule
+\end{tabular}
+\end{tcolorbox}
+
+\begin{warnbox}[Normalisation statistics are model parameters]
+They must be computed \emph{exclusively on the training split} and then applied identically to the validation and test splits. Computing statistics on the full dataset before splitting introduces data leakage and leads to optimistically biased generalisation estimates. When using a pre-trained model, always import and apply its original pre-processing function.
+\end{warnbox}
+
+%------------------------------------------------------------
+\subsubsection{Batch Normalisation}
+\label{sec:batchnorm2}
+%------------------------------------------------------------
+
+Even after input normalisation, intermediate activations can shift and grow during training — a phenomenon called \term{internal covariate shift} (Ioffe \& Szegedy, ICML 2015). Batch Normalisation (BN) addresses this by normalising activations on the fly at each layer.
+
+\textbf{The transformation.} Given a mini-batch of activations $\{x_i\}$ for a single channel, BN first applies z-score normalisation:
+\[
+x_i' = \frac{x_i - \mathbb{E}[x_i]}{\sqrt{\mathrm{Var}[x_i] + \varepsilon}},
+\]
+where $\mathbb{E}[x_i]$ and $\mathrm{Var}[x_i]$ are computed \emph{per channel} over the current mini-batch, and $\varepsilon>0$ ensures numerical stability. To avoid over-constraining the representation (e.g.\ always forcing a sigmoid into its linear regime), BN adds \textbf{learnable affine parameters}:
+
+\begin{defbox}{Batch Normalisation}
+\[
+y_{i,j} = \gamma_j \, x_i' + \beta_j
+\]
+where $\gamma_j$ (scale) and $\beta_j$ (shift) are learned per channel via backpropagation. The mean and variance are \emph{non-trainable}: they are computed from each mini-batch during training and replaced by running averages at test time.
+\end{defbox}
+
+\textbf{Parameter count.} For a BN layer with $C$ input channels:
+
+\begin{center}
+\begin{tabular}{lc}
+\toprule
+Parameter type & Count \\
+\midrule
+Trainable (scale $\gamma$ + shift $\beta$) & $2C$ \\
+Non-trainable (running mean + running variance) & $2C$ \\
+\midrule
+\textbf{Total} & $4C$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+For example, a BN layer after a convolution producing 64 feature maps has 128 trainable and 128 tracked parameters (256 total).
+
+\textbf{Training vs.\ inference.} During inference the running averages are frozen, making BN a \emph{fixed linear operator} that can be \textbf{fused with the preceding layer} at zero extra cost.
+
+\begin{insightbox}[Benefits and caveats of Batch Normalisation]
+\textbf{Benefits:} makes deep networks much easier to train; improves gradient flow; allows higher learning rates and faster convergence; reduces sensitivity to initialisation; acts as a regulariser.\\
+\textbf{Watch out:} BN behaves differently during training and inference — always call \texttt{model.eval()} when evaluating, just as with dropout.
+\end{insightbox}
+
+\textbf{PyTorch API:}
+\begin{lstlisting}[language=Python, caption={BatchNorm2d in PyTorch}]
+# affine=True (default): learns gamma and beta
+m = nn.BatchNorm2d(num_features=64)
+
+# affine=False: pure z-score normalisation, no learnable params
+m = nn.BatchNorm2d(num_features=64, affine=False)
+\end{lstlisting}
+Key parameters: \texttt{num\_features} = $C$ (number of channels); \texttt{eps} $= 10^{-5}$ (numerical stability); \texttt{momentum} $= 0.1$ (controls running average update); \texttt{affine} = learns $\gamma, \beta$ when \texttt{True}.
+
+%------------------------------------------------------------
+\subsection{Multi-Label Classification}
+%------------------------------------------------------------
+
+Standard classifiers output exactly one class per image. When an image can contain \emph{multiple simultaneous objects} (e.g.\ both a cat and a dog), the output head must change.
+
+\begin{defbox}{Multi-Label CNN Architecture}
+Replace the \textbf{softmax} output with \textbf{independent sigmoid} activations, one per class:
+\[
+p_i = \sigma(z_i) = \frac{1}{1+e^{-z_i}} \in [0,1].
+\]
+Unlike softmax, the outputs $\{p_i\}$ do \emph{not} sum to 1 — each is an independent probability of class membership. The model is trained with \textbf{binary cross-entropy} loss:
+\[
+\mathcal{L} = -\frac{1}{L}\sum_{i=1}^{L}\bigl[y_i \log p_i + (1-y_i)\log(1-p_i)\bigr],
+\]
+where $y_i \in \{0,1\}$ is the ground-truth indicator for class $i$ and $L$ is the total number of classes.
+\end{defbox}
+
+%------------------------------------------------------------
+\subsection{Class Activation Maps (CAM)}
+\label{sec:cam}
+%------------------------------------------------------------
+
+\subsubsection{Motivation: The GAP Layer Revisited}
+
+The GAP layer was originally introduced as a structural regulariser. Zhou et al.\ (CVPR 2016) showed it also preserves \emph{spatial localisation information} up to the final prediction. By computing a weighted combination of the last convolutional feature maps, one can produce a spatial heat-map — the \term{Class Activation Map} — highlighting the image regions most responsible for a given class prediction.
+
+\subsubsection{Mathematical Derivation}
+
+Let the last convolutional block produce $C$ feature maps $f_k(x,y)$. The GAP layer computes:
+\[
+F_k = \sum_{(x,y)} f_k(x,y), \qquad k=1,\ldots,C.
+\]
+A single FC layer then scores each class $c$:
+\[
+S_c = \sum_{k=1}^{C} w_k^c \, F_k,
+\]
+where $w_k^c$ encodes the importance of feature map $k$ for class $c$. Substituting:
+\[
+S_c = \sum_k w_k^c \sum_{(x,y)} f_k(x,y) = \sum_{(x,y)} \underbrace{\sum_k w_k^c f_k(x,y)}_{M_c(x,y)}.
+\]
+
+\begin{defbox}{Class Activation Map}
+\[
+M_c(x,y) = \sum_k w_k^c \, f_k(x,y)
+\]
+$M_c(x,y)$ directly indicates the importance of spatial location $(x,y)$ for predicting class $c$.
+\end{defbox}
+
+\begin{notebox}[GAP + FC vs.\ NiN]
+Unlike NiN (which feeds GAP directly into the softmax), adding a separate FC layer means the number of feature-map channels $C$ need not equal the number of classes $L$, giving much more flexibility in network design.
+\end{notebox}
+
+CAMs are low-resolution (same spatial size as the last feature maps). They are upsampled to the input image resolution via \textbf{bilinear interpolation} before visualisation.
+
+\subsubsection{Class Specificity}
+
+CAMs are \term{class-specific}: the same feature-map activations $\{f_k(x,y)\}$ are shared across all queries, but the weights $\{w_k^c\}$ differ per class. For an image containing both a cat and a dog, querying CAM for ``cat'' highlights the cat region; querying for ``dog'' highlights the dog region.
+
+\subsubsection{Practical Considerations}
+
+\begin{itemize}
+  \item CAM can be inserted into any pre-trained network by removing the original FC head and replacing it with GAP + a single dense layer, which must be fine-tuned.
+  \item In VGG, removing the FC layers discards $>90\%$ of all parameters, causing a noticeable accuracy drop.
+  \item \textbf{Resolution/semantic trade-off}: placing GAP on larger feature maps (earlier in the network) gives finer-grained CAMs but less semantically meaningful ones; later placement is coarser but richer.
+  \item \textbf{GAP vs.\ GMP}: GAP encourages capturing the \emph{entire} object extent; Global Max Pooling focuses on the single most discriminative location per channel, yielding sparser localisations.
+\end{itemize}
+
+%------------------------------------------------------------
+\subsection{Weakly Supervised Localisation (WSL)}
+\label{sec:wsl}
+%------------------------------------------------------------
+
+\subsubsection{Motivation and Formal Setting}
+
+Bounding-box annotations are expensive to collect. \term{Weakly Supervised Localisation} (WSL) aims to obtain spatial localisation estimates using only image-level class labels.
+
+\begin{defbox}{Weak Supervision}
+In standard supervised learning, the model $\mathcal{M}: X \to Y$ is trained on pairs sharing the same label type as the inference target. In WSL:
+\begin{itemize}
+  \item \textbf{Training labels}: $K$ = image-level class labels (cheap).
+  \item \textbf{Inference target}: $Y = \mathbb{R}^4$ = bounding box coordinates (expensive).
+\end{itemize}
+$\mathcal{M}$ is trained for classification ($X \to K$) but queried for localisation ($X \to Y$) — localisation comes for free as a by-product.
+\end{defbox}
+
+\subsubsection{WSL Pipeline via CAM}
+
+\begin{enumerate}
+  \item Train a classifier with GAP + a single dense output layer.
+  \item Compute the CAM $M_c(x,y)$ for the desired class $c$.
+  \item Threshold at $0.2 \times \max_{(x,y)} M_c(x,y)$.
+  \item Draw the smallest axis-aligned bounding box around the thresholded region.
+\end{enumerate}
+
+\begin{insightbox}[Localisation at no annotation cost]
+The spatial information is learned implicitly during classification training. The four-step pipeline above requires no bounding-box labels whatsoever — the classifier tells us \emph{what} is in the image, and the CAM tells us \emph{where}.
+\end{insightbox}
+
+%------------------------------------------------------------
+\subsection{Explaining Neural Network Predictions: Saliency Maps}
+\label{sec:saliency}
+%------------------------------------------------------------
+
+\subsubsection{Motivation}
+
+Deep networks have millions of parameters and largely opaque internals. In safety-critical applications (medical diagnosis, fraud detection, autonomous driving), it is often mandatory to understand \emph{why} a model made a prediction. \term{Saliency maps} are the simplest and most widespread tool for this.
+
+A saliency map is a spatial heat-map overlaid on the input image: higher values indicate regions that contributed more to the final prediction.
+
+\textbf{Key applications:}
+\begin{itemize}
+  \item \textbf{Understanding mistakes}: visualise what the network ``looked at'' when it predicted incorrectly.
+  \item \textbf{Discovering systematic errors} (\emph{Clever Hans} phenomena): a model may be correct for the wrong reason — e.g.\ a horse classifier that fires on a watermark rather than the horse.
+\end{itemize}
+
+\begin{warnbox}[CAM as an explainability tool — limitation]
+CAM requires modifying the architecture (removing the original FC head), so the model being explained is \emph{different} from the deployed model. Grad-CAM solves this problem by explaining any CNN without architectural changes.
+\end{warnbox}
+
+%------------------------------------------------------------
+\subsubsection{Grad-CAM}
+\label{sec:gradcam2}
+%------------------------------------------------------------
+
+\term{Grad-CAM} (Selvaraju et al., ICCV 2017) generalises CAM to any CNN by using the \textbf{gradient of the class score with respect to the last convolutional feature maps} as importance weights, rather than the learned FC weights.
+
+Let $a_k(i,j)$ be the activation of feature map $k$ at location $(i,j)$, and $y^c$ the pre-softmax score for class $c$. The Grad-CAM importance weight for feature map $k$ is the global spatial average of the gradient:
+
+\begin{defbox}{Grad-CAM}
+\[
+w_k^c = \frac{1}{nm}\sum_i\sum_j \frac{\partial y^c}{\partial a_k(i,j)}
+\]
+\[
+g^c = \mathrm{ReLU}\!\left(\sum_k w_k^c \, \mathbf{a}_k\right)
+\]
+The ReLU discards features that \emph{decrease} the score for class $c$ (negative contributions), retaining only those that push the prediction upward.
+\end{defbox}
+
+\begin{notebox}[Desiderata for saliency maps]
+\begin{enumerate}
+  \item \textbf{Class discriminativeness}: different classes must produce different heat-maps on the same image.
+  \item \textbf{High spatial resolution}: critical in medical and industrial imaging where small regions matter. There is an inherent \emph{depth trade-off}: early layers retain fine spatial detail but have little semantic content; late layers are semantically rich but spatially coarse. Grad-CAM operates on the last convolutional layer and therefore produces low-resolution maps.
+\end{enumerate}
+\end{notebox}
+
+%------------------------------------------------------------
+\subsubsection{Augmented Grad-CAM}
+\label{sec:auggradcam2}
+%------------------------------------------------------------
+
+\term{Augmented Grad-CAM} (Morbidelli et al., ICASSP 2020) improves spatial resolution via a \textbf{super-resolution} approach, without modifying the underlying network.
+
+\textbf{Key idea.} A CNN is approximately prediction-invariant to small geometric transformations, but the Grad-CAM $g_\ell$ computed from the $\ell$-th augmented input $\mathcal{A}_\ell(\mathbf{x})$ contains \emph{different spatial information} about the true high-resolution map $\mathbf{h}$. Each $g_\ell$ is modelled as a linear downsampled version of a perturbed $\mathbf{h}$:
+\[
+g_\ell \approx \mathcal{D}\!\bigl(\mathcal{A}_\ell(\mathbf{h})\bigr),
+\]
+where $\mathcal{D}: \mathbb{R}^{N\times M} \to \mathbb{R}^{n\times m}$ is a linear downsampling operator.
+
+\textbf{Super-resolution formulation.} The high-resolution map is recovered by solving a convex inverse problem:
+
+\begin{thmbox}{Augmented Grad-CAM Optimisation}
+\[
+\hat{\mathbf{h}} = \arg\min_{\mathbf{h}} \;
+\frac{1}{2}\sum_{\ell=1}^{L}\bigl\lVert \mathcal{D}(\mathcal{A}_\ell(\mathbf{h})) - g_\ell \bigr\rVert_2^2
++ \lambda \, \mathrm{TV}_{\ell_1}(\mathbf{h}) + \frac{\mu}{2}\lVert\mathbf{h}\rVert_2^2
+\]
+where $\mathrm{TV}_{\ell_1}(\mathbf{h}) = \sum_{i,j}|\partial_x h(i,j)| + |\partial_y h(i,j)|$ is the \term{anisotropic total-variation} regulariser, which preserves edges in the reconstructed map. The problem is convex and non-smooth; it is solved via \textbf{sub-gradient descent}.
+\end{thmbox}
+
+\begin{insightbox}[Generality of the framework]
+Augmented Grad-CAM is a general approach: the augmentation + super-resolution pipeline can be combined with \emph{any} visualisation tool, not only Grad-CAM, to produce high-resolution saliency maps.
+\end{insightbox}
+
+%------------------------------------------------------------
+\subsection{Application: Weakly Supervised Localisation for Environmental Crime}
+%------------------------------------------------------------
+
+These techniques have direct real-world impact. The \term{ODIN} platform, developed in collaboration with ARPA Lombardia and Prof.\ Fraternali's group at Politecnico di Milano, applies WSL to detect \textbf{illegal landfills} in very-high-resolution (VHR) satellite imagery:
+
+\begin{itemize}
+  \item A binary classifier (``waste'' vs.\ ``no waste'') is trained on image-level labels only.
+  \item Grad-CAM highlights sub-regions most responsible for positive predictions, effectively segmenting candidate landfill areas without pixel-level annotation.
+  \item The system has automatically scanned more than 100 municipalities in Lombardy on Google Earth imagery.
+  \item Regular survey cycles detect both existing and new disposal sites.
+\end{itemize}
+
+This is a compelling demonstration of how cheap classification-level supervision can yield actionable spatial predictions at scale.
+
+%------------------------------------------------------------
+\subsection{Recap: Lecture 10 Key Points}
+%------------------------------------------------------------
+
+\begin{tcolorbox}[colback=WarningRedBg,colframe=WarningRed,boxrule=0.8pt,arc=3pt]
+\textbf{Lecture 10 — Summary (Exam Checklist)}
+\begin{enumerate}
+  \item \textbf{Batch Normalisation}: z-score normalisation per channel per mini-batch + learnable $\gamma, \beta$; $4C$ total parameters; fused linear operator at test time; behaves differently in train vs.\ eval.
+  \item \textbf{Multi-label classification}: sigmoid outputs (not softmax) + binary cross-entropy loss; outputs do not sum to 1.
+  \item \textbf{CAM}: $M_c(x,y) = \sum_k w_k^c f_k(x,y)$; requires GAP + single FC layer; class-specific; needs bilinear upsampling.
+  \item \textbf{Weakly Supervised Localisation}: train on image-level labels, threshold CAM at $0.2 \times \max$, fit bounding box — localisation for free.
+  \item \textbf{Saliency maps}: visualise which spatial regions drive a prediction; useful for debugging and Clever Hans detection.
+  \item \textbf{Grad-CAM}: uses $\partial y^c / \partial a_k$ as importance weights; works on any CNN without modifying the architecture.
+  \item \textbf{Augmented Grad-CAM}: super-resolution of low-resolution heat-maps via augmentation + TV-regularised inverse problem.
+\end{enumerate}
+\end{tcolorbox}
+
+\end{document}
