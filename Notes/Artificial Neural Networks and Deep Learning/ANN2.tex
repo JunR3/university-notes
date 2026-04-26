@@ -2390,4 +2390,792 @@ This is a compelling demonstration of how cheap classification-level supervision
 \end{enumerate}
 \end{tcolorbox}
 
+%=========================================================
+\section{Convolutional Neural Networks for Semantic Segmentation}
+\label{sec:semseg}
+%=========================================================
+
+\subsection{What is Image Segmentation?}
+
+Before diving into neural approaches, it is worth understanding what segmentation formally means and why it is hard. Given an image $I : \Omega \to \mathbb{R}^3$ with spatial domain $\Omega$, \term{image segmentation} consists in estimating a partition $\{R_1, R_2, \ldots, R_K\}$ of $\Omega$ such that $\bigcup_k R_k = \Omega$ and $R_i \cap R_j = \emptyset$ for $i \neq j$.
+
+There are two broad flavours of segmentation. \emph{Unsupervised} segmentation (e.g.\ superpixel algorithms such as SLIC) groups pixels by low-level visual similarity without any class vocabulary. \emph{Supervised}, or \term{semantic segmentation}, assigns each pixel a label from a fixed category set, using annotated training data. This section is entirely about the supervised case.
+
+\begin{defbox}{Semantic Segmentation — Formal Problem Statement}
+Given an image $I \in \mathbb{R}^{H \times W \times 3}$, \textbf{semantic segmentation} consists in assigning to each pixel $(i,j) \in \Omega$ a label $\hat{y}(i,j)$ drawn from a fixed set of categories $\mathcal{C} = \{c_1, c_2, \ldots, c_K\}$. The output is a \emph{label map} $\hat{Y} \in \mathcal{C}^{H \times W}$.
+
+Formally, we seek a model $f_\theta : \mathbb{R}^{H\times W\times 3} \to \mathcal{C}^{H\times W}$ trained on pairs $(I_n, Y_n)$ from a labelled dataset $\mathcal{D} = \{(I_n, Y_n)\}_{n=1}^N$, where $Y_n$ is a pixel-wise ground-truth annotation.
+\end{defbox}
+
+\begin{notebox}[Semantic vs.\ Instance Segmentation]
+Semantic segmentation assigns a single class to every pixel, but does \emph{not} distinguish between different instances of the same class. If two persons overlap, all of their pixels receive the label \texttt{person}. \term{Instance segmentation} goes further, separately delineating each individual object instance (e.g.\ \texttt{person\#1}, \texttt{person\#2}). This lecture addresses semantic segmentation only.
+\end{notebox}
+
+\subsubsection{Why Semantic Segmentation Matters}
+
+In natural-image benchmarks, object detection and counting may seem more practically relevant than dense pixel labelling. However, in domains such as \textbf{medical imaging} and \textbf{remote sensing}, semantic segmentation is indispensable: one must measure the \emph{area} covered by a tumour, a lesion, or a land-use class — none of which a bounding box can capture faithfully. The same applies to autonomous driving, where the full drivable surface must be identified, not merely bounding boxes around obstacles.
+
+\subsubsection{Annotations and Their Cost}
+
+Training a semantic segmentation model requires \emph{dense, pixel-wise annotations} — every pixel in every training image must be labelled. This is extremely labour-intensive: the Microsoft COCO dataset provides 200\,000 annotated images across 80 categories, with humans annotating each instance's contour. In specialised domains (e.g.\ medical imaging), annotation time can reach \emph{2 hours per image}, creating a severe bottleneck that motivates weakly supervised and transfer-learning approaches.
+
+%------------------------------------------------------------
+\subsection{Naive Approaches and Their Shortcomings}
+\label{sec:semseg_naive}
+%------------------------------------------------------------
+
+\subsubsection{Patch-Based (Plain Vanilla) Classification}
+
+The most straightforward approach is to repurpose a standard CNN classifier as a sliding-window segmenter:
+
+\begin{enumerate}
+  \item Extract every patch $P_{i,j}$ of a fixed size centred at pixel $(i,j)$.
+  \item Assign to each patch the ground-truth label of its \emph{central pixel}.
+  \item Train a CNN classifier on this patch dataset.
+  \item At inference, slide the classifier over all patch positions and write the predicted class back to the central pixel.
+\end{enumerate}
+
+This is conceptually clean but \textbf{computationally catastrophic}: for an $H\times W$ image, one must run $H\times W$ separate forward passes, each recomputing the shared convolutional features of hugely overlapping patches. The patch size is also a difficult hyperparameter — too small a patch yields insufficient semantic context; too large a patch loses precise spatial grounding.
+
+\subsubsection{Convolutions Only (No Pooling)}
+
+A second naive idea is to build a purely convolutional network with no pooling or striding at all, so that the spatial resolution is preserved throughout, and the final layer directly predicts one label per pixel. While this avoids the resolution loss, it comes at a severe cost: the \emph{receptive field} of each output unit is tiny (growing only linearly with depth), so the network cannot integrate the global context needed to understand what an object is. It is also extremely memory- and compute-inefficient for deep architectures.
+
+\begin{insightbox}[The Core Tension in Semantic Segmentation]
+Semantic segmentation faces an inherent tension between \textbf{semantics} and \textbf{localisation}:
+\begin{itemize}
+  \item \textbf{Global context resolves \emph{what}}: pooling and striding allow large receptive fields, enabling the network to recognise objects from their holistic appearance.
+  \item \textbf{Local detail resolves \emph{where}}: fine spatial resolution is needed to draw sharp, accurate boundaries.
+\end{itemize}
+Neither extreme (purely local convolutions vs.\ aggressive pooling) is satisfactory on its own. The right architecture must do both, which motivates the encoder--decoder designs discussed below.
+\end{insightbox}
+
+%------------------------------------------------------------
+\subsection{From CNN Classifier to Fully Convolutional Network (FC-CNN)}
+\label{sec:fccnn}
+%------------------------------------------------------------
+
+A seminal conceptual step, introduced by Long, Shelhamer, and Darrell (CVPR 2015), is to observe that a CNN classifier can be \emph{surgically converted} into a dense predictor without retraining from scratch, simply by replacing its fully connected (FC) layers with equivalent $1\times 1$ convolutions.
+
+\subsubsection{Why FC Layers Constrain Input Size}
+
+In a standard CNN, the convolutional and pooling layers slide over the input and thus accept any spatial size — they always produce a spatial feature map whose dimensions scale proportionally with the input. The \emph{fully connected} layer, however, has a fixed number of input neurons equal to the spatial size of the feature map it receives. A larger input image produces a larger feature map, which then has too many entries to feed into the fixed-size FC layer. As a result, the FC layer acts as a hard constraint that locks the CNN to one fixed input resolution.
+
+\subsubsection{The FC $\to$ Conv Equivalence}
+
+The crucial observation is that an FC layer is a \emph{linear} operation, and any linear operation on a spatial feature map can be written as a convolution. Concretely, suppose the feature map just before the first FC layer has spatial extent $H' \times W'$ and $C$ channels, so it is a tensor of shape $(H' \times W' \times C)$. An FC layer with $L$ output neurons applies a weight matrix $W \in \mathbb{R}^{L \times (H' W' C)}$ to the flattened input.
+
+\begin{defbox}{Equivalence of FC and $1\times1$ Convolution}
+An FC layer with $L$ outputs operating on a feature map of shape $(H', W', C)$ is \textbf{exactly equivalent} to a $2$D convolution with $L$ filters of spatial size $H' \times W'$ and depth $C$, applied with no padding and stride 1. The weight of the $\ell$-th filter is the reshaped $\ell$-th row of the FC weight matrix.
+
+In the special case $H' = W' = 1$ (feature map already collapsed to $1\times 1$), this reduces to a \textbf{$1\times 1$ convolution} — a pointwise linear combination across channels.
+\end{defbox}
+
+This equivalence means we can replace every FC layer in a pre-trained CNN with a convolutional layer carrying the same weights, obtaining a \term{Fully Convolutional Network} (FC-CNN) that: (i) is numerically identical to the original classifier when fed the original fixed-size input; and (ii) seamlessly accepts larger inputs, producing a \emph{spatial heatmap} of class probabilities instead of a single class vector.
+
+\subsubsection{FC-CNN Output: Heatmaps}
+
+When a larger image of size $(H + \delta) \times (W + \delta)$ is fed to the FC-CNN, each spatial position $(u,v)$ in the output heatmap corresponds to the receptive field of that position in the input — i.e.\ it reports the class probability for the image region that ``fed into'' output unit $(u,v)$. The output heatmap has lower resolution than the input due to cumulative pooling and striding in the encoder.
+
+Applying softmax independently at each spatial position gives a $K$-channel output tensor (one channel per class). The predicted label map is obtained by taking $\arg\max$ along the class dimension:
+\[
+  \hat{Y}(u,v) = \arg\max_{c \in \mathcal{C}} \; \text{softmax}_c\!\left(h_{u,v}\right),
+\]
+where $h_{u,v} \in \mathbb{R}^K$ is the logit vector at position $(u,v)$.
+
+\subsubsection{PyTorch: Migrating a Pre-trained CNN to FC-CNN}
+
+Concretely, once a CNN classifier is trained, its FC weights can be transferred directly into an equivalent convolutional layer as follows:
+
+\begin{lstlisting}[caption={Migrating a dense layer to a 1$\times$1 convolutional layer in PyTorch}]
+# dense1 is the FC layer in the classifier;
+# conv1x1 is the corresponding layer in the FC-CNN.
+# L = number of output neurons; C = input depth to dense1.
+w = dense1.weight.data.clone()   # shape (L, C*H'*W')
+b = dense1.bias.data.clone()
+
+# Reshape to convolutional filter tensor (L, C, H', W')
+w1 = w.view(L, C, 1, 1)   # if H'=W'=1 already collapsed
+
+conv1x1.weight.data = w1
+conv1x1.bias.data   = b
+\end{lstlisting}
+
+The resulting FC-CNN is far more efficient than the patch-extraction approach: convolutional computations in overlapping regions are \emph{shared} across all output positions rather than repeated.
+
+\subsubsection{Limitations of FC-CNN for Segmentation}
+
+The FC-CNN produces heatmaps whose spatial resolution is much smaller than the input image — typically by a factor of 16 or 32, determined by the cumulative stride of all pooling and strided-convolution layers. The resulting predictions are very coarse and cannot capture fine object boundaries. There are three strategies to recover full-resolution predictions:
+
+\paragraph{Direct upsampling.} Simply bilinearly interpolate the low-resolution heatmap back to the original image size. This is fast but yields blurry, spatially imprecise predictions.
+
+\paragraph{Shift-and-stitch.} Compute heatmaps for all $f^2$ possible integer shifts of the input (where $f$ is the downsampling factor), then interleave the resulting maps to reconstruct a full-resolution prediction. This is equivalent to removing strides from pooling layers and rarefying (dilating) subsequent filters, giving the same receptive field at full resolution. While this exploits the full network depth, the upsampling is rigid and does not improve prediction quality over learned upsampling.
+
+\paragraph{Learned upsampling (transpose convolution).} Add a learnable decoder that progressively upsamples the heatmap. This is the approach taken by modern segmentation networks and is discussed in depth below.
+
+\begin{warnbox}[FC-CNN is not the end of the story]
+Moving a classifier to an FC-CNN is the conceptual foundation of segmentation networks, but it is \emph{not} sufficient on its own: the output is too low-resolution, and there is no trainable upsampling. FC-CNNs are mainly useful when only \emph{image-level} labels (not pixel-level annotations) are available for training.
+\end{warnbox}
+
+%------------------------------------------------------------
+\subsection{Encoder--Decoder Architectures and Upsampling}
+\label{sec:enc_dec}
+%------------------------------------------------------------
+
+The natural solution to the resolution--semantics tension is a two-stage architecture: an \term{encoder} (contracting path) that progressively downsamples the input to extract rich semantic features at low resolution, followed by a \term{decoder} (expanding path) that progressively upsamples back to the original spatial resolution. The two halves are symmetric.
+
+\subsubsection{Standard Upsampling Primitives}
+
+Several operations can increase spatial resolution.
+
+\textbf{Bilinear interpolation} uses the standard image-upsampling formula to place output values between known input positions. It is non-learnable and parameter-free.
+
+\textbf{Bed-of-nails (nearest-neighbour) upsampling} copies each input value to the top-left corner of its corresponding $s\times s$ block of output positions, filling the rest with zeros ($s$ is the upsampling factor). Again non-learnable.
+
+\textbf{Max-unpooling} is the inverse of max-pooling: the positions of the maxima are recorded during the downsampling forward pass (\emph{pooling switches}), and during upsampling the values are placed back at those exact positions, with zeros elsewhere. This preserves the precise location of the strongest activations.
+
+\subsubsection{Trainable Upsampling: Transpose Convolution}
+
+Non-learnable upsampling discards information; the network cannot adapt the upsampling to the task. \term{Transpose convolution} (also called \emph{fractionally strided convolution} or, misleadingly, \emph{deconvolution}) introduces learnable parameters into the upsampling step.
+
+\begin{defbox}{Transpose Convolution}
+A transpose convolution with kernel size $k$ and stride $s$ maps an input of spatial size $n$ to an output of spatial size approximately $s \cdot n$. For each input activation at position $p$, the filter $F \in \mathbb{R}^{k \times k \times C_\text{in} \times C_\text{out}}$ is multiplied by that activation and placed at the corresponding output position, with appropriate stride. Overlapping contributions are summed.
+
+Equivalently, a transpose convolution is the gradient of a standard convolution with the same filter: it ``reverses'' the spatial compression of a strided convolution.
+\end{defbox}
+
+\begin{notebox}[Naming confusion]
+The name ``deconvolution'' is commonly used for transpose convolution but is \textbf{highly misleading}: true deconvolution is a signal-processing operation that inverts the blurring effect of a filter. Transpose convolution does not invert blurring — it learns to upsample. The correct names are \emph{transpose convolution}, \emph{fractionally strided convolution}, or \emph{backward strided convolution}.
+\end{notebox}
+
+A typical decoder block combines upsampling with learnable refinement:
+\[
+  \textbf{Upsample}({\times}2) \;\to\; \textbf{Conv2D} + \text{ReLU} \;\to\; \textbf{Conv2D} + \text{ReLU}
+\]
+By adjusting the number of filters in the final convolutional layer one controls the output channel depth. Batch normalisation and dropout can be inserted between layers. The block can be repeated to achieve any upsampling factor.
+
+\subsubsection{Upsampling Filters as Bilinear Initialisation}
+
+Upsampling can also be implemented as a standard convolution applied to a \emph{fractional stride} input (the input inserted into a grid of zeros with stride $1/s$). Long et al.\ showed that initialising these upsampling filters as bilinear interpolation kernels is a good starting point, and they can then be fine-tuned during training on the segmentation dataset.
+
+\subsubsection{Training Loss for Dense Prediction}
+
+Because the network produces a per-pixel prediction, the standard \term{categorical cross-entropy} loss is simply summed (or averaged) over all pixels:
+
+\begin{defbox}{Pixel-wise Cross-Entropy Loss}
+Let $\Omega$ denote the set of all spatial positions in an annotated image, and let $y(i,j) \in \mathcal{C}$ be the ground-truth label at position $(i,j)$. The segmentation loss is:
+\[
+  \mathcal{L}(\theta) = \arg\min_\theta \sum_{(i,j)\in\Omega} \mathcal{L}_{\text{CE}}\!\left(f_\theta(I)_{i,j},\; y(i,j)\right).
+\]
+Each image in a mini-batch already contributes $|\Omega|$ individual loss evaluations, so the gradients are computed over a very large effective batch even with a small number of images. For regression outputs (e.g.\ depth estimation), the same pixel-wise summation applies with MSE as the per-pixel loss.
+\end{defbox}
+
+For full-image training one must account for potential \emph{class imbalance}: background pixels are far more numerous than foreground classes. Two standard remedies are (i) reweighting the loss by the inverse class frequency $w_c$, and (ii) drawing a random binary mask $r(i,j) \sim \text{Bernoulli}(p)$ at each iteration to subsample pixels and introduce stochasticity.
+
+%------------------------------------------------------------
+\subsection{U-Net}
+\label{sec:unet}
+%------------------------------------------------------------
+
+\term{U-Net} (Ronneberger, Fischer, and Brox, MICCAI 2015) is arguably the most influential architecture for biomedical image segmentation, and one of the most widely adopted encoder--decoder designs across all domains. It won the 2015 ISBI cell-tracking challenge and introduced a key architectural innovation: \emph{skip connections} that concatenate encoder feature maps directly into the decoder.
+
+The network has 23 layers and no fully connected layers at all — predictions emerge from convolutional feature maps alone, making it fully convolutional and therefore applicable to images of arbitrary size (by tiling with overlap).
+
+\subsubsection{Contracting Path (Encoder)}
+
+The encoder progressively captures context by repeatedly applying:
+\begin{enumerate}
+  \item $3\times 3$ convolution + ReLU (no padding, so each convolution slightly reduces spatial size),
+  \item $3\times 3$ convolution + ReLU,
+  \item $2\times 2$ max-pooling with stride 2.
+\end{enumerate}
+At each downsampling step, the number of feature channels is \emph{doubled}. The structure is identical to the feature-extraction front end of standard CNN classifiers — this is precisely why the encoder of a U-Net can be initialised from a pre-trained ImageNet model via transfer learning.
+
+\subsubsection{Skip Connections}
+
+The decisive innovation of U-Net is the use of \term{skip connections}: before each max-pooling step, the current feature map (which still retains high spatial resolution) is saved and later \emph{concatenated} (along the channel axis) with the corresponding upsampled feature map in the decoder.
+
+\begin{insightbox}[Why skip connections matter]
+The encoder progressively compresses spatial information to build a semantically rich, low-resolution bottleneck. In doing so, fine boundary detail is lost. The decoder must somehow recover this detail. Skip connections provide a direct, high-resolution ``memory'' of early encoder activations, allowing the decoder to refine coarse semantic predictions with precise spatial detail. This is the architectural solution to the what/where tension.
+\end{insightbox}
+
+\subsubsection{Expanding Path (Decoder)}
+
+The decoder mirrors the encoder. Each expanding block consists of:
+\begin{enumerate}
+  \item Upsampling (transpose convolution that doubles spatial size and halves the channel count),
+  \item Concatenation with the corresponding cropped encoder feature map via the skip connection,
+  \item $3\times 3$ convolution + ReLU,
+  \item $3\times 3$ convolution + ReLU.
+\end{enumerate}
+Cropping of the encoder feature map before concatenation is necessary because the repeated ``no-padding'' convolutions in the encoder slightly reduce spatial extent, so the encoder and decoder maps are not exactly the same size.
+
+\subsubsection{Network Top and Output}
+
+The final layer is a $1\times 1$ convolution that maps the last feature map to a $K$-channel output (one channel per class). For the original binary segmentation task (cell vs.\ background) $K = 2$. The output image is smaller than the input by a fixed border — predictions are only made at pixels for which the full context falls within the input image. In practice, a valid prediction for the entire image is recovered by tiling with a sufficient overlap area.
+
+\begin{defbox}{U-Net Block in PyTorch}
+\begin{lstlisting}[caption={One contracting block of U-Net in PyTorch}]
+import torch.nn as nn
+
+class UNetBlock(nn.Module):
+    def __init__(self, in_ch, out_ch):
+        super().__init__()
+        self.conv = nn.Sequential(
+            nn.Conv2d(in_ch, out_ch, kernel_size=3, padding=1),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(out_ch, out_ch, kernel_size=3, padding=1),
+            nn.ReLU(inplace=True),
+        )
+    def forward(self, x):
+        return self.conv(x)
+\end{lstlisting}
+\texttt{padding=1} with \texttt{kernel\_size=3} preserves the spatial dimensions after each convolution; the original U-Net used no padding (spatial shrinkage is small), but padding=1 is common in modern implementations.
+\end{defbox}
+
+\subsubsection{Training U-Net: Data Augmentation and Weighted Loss}
+
+U-Net was trained on only about \textbf{30 annotated images}, which would normally be far too few. The key to making this work is \emph{aggressive data augmentation}, in particular \term{elastic deformations}: random smooth displacement fields are applied to both the raw image and its ground-truth segmentation map simultaneously, generating realistic-looking cell shapes that the network has never seen. This augmentation strategy is domain-specific — elastic deformations would be unrealistic for rigid objects in natural scenes, but are entirely realistic for biological cells.
+
+\medskip
+A second challenge in cell segmentation is the \textbf{separation of touching cells of the same class}. Two touching cells have the same label; the thin background strip between them must be correctly classified as background, but it is extremely underrepresented in the training data. U-Net addresses this with a \term{weighted loss function}:
+
+\begin{thmbox}{U-Net Weighted Loss}
+\[
+  \mathcal{L}(\theta) = \min_\theta \sum_{(i,j)\in\Omega} w(i,j)\; \mathcal{L}_{\text{CE}}\!\left(f_\theta(I)_{i,j},\, y(i,j)\right),
+\]
+where the per-pixel weight $w(i,j)$ is pre-computed as:
+\[
+  w(i,j) = w_c\!\left(y(i,j)\right) + w_0 \exp\!\left(-\frac{\bigl(d_1(i,j)+d_2(i,j)\bigr)^2}{2\sigma^2}\right).
+\]
+\begin{itemize}
+  \item $w_c(y)$ is a class-frequency balancing term (inverse frequency of class $y$).
+  \item $d_1(i,j)$ and $d_2(i,j)$ are the distances from pixel $(i,j)$ to the borders of the nearest and second-nearest cell instances, respectively.
+  \item The exponential term is large where $d_1 + d_2$ is small — i.e.\ in the narrow background gap \emph{between two touching cells} — forcing the network to pay special attention to these critical boundary pixels.
+\end{itemize}
+\end{thmbox}
+
+The intuition is:
+\begin{itemize}
+  \item \textbf{Background near a single cell}: $d_1$ is small but $d_2$ is large $\Rightarrow$ moderate weight.
+  \item \textbf{Background between two touching cells}: both $d_1$ and $d_2$ are small $\Rightarrow$ very large weight (thin red strip in the weight map).
+  \item \textbf{Pixels inside a cell or far from all cells}: $d_1$ and $d_2$ are both large $\Rightarrow$ weight determined mainly by $w_c$.
+\end{itemize}
+
+Training uses a single full image per batch (each image provides many individual pixel-level loss contributions), runs for about 10 hours, and employs momentum-based SGD with a high momentum coefficient to stabilise updates.
+
+%------------------------------------------------------------
+\subsection{Patch-wise vs.\ Full-Image Training}
+\label{sec:training_modes}
+%------------------------------------------------------------
+
+There are two distinct training regimes for segmentation networks, each with its own trade-offs.
+
+\subsubsection{Patch-wise Training}
+
+In patch-wise training one prepares a classification dataset: patches are cropped from annotated images and each is assigned the label of its central pixel. A CNN classifier (or the encoder of an FC-CNN) is then trained on this dataset. After training, the FC layers are convolutionalised (Section~\ref{sec:fccnn}) and the upsampling decoder is appended.
+
+Patch-wise training offers one key advantage: \emph{patch resampling}. One can oversample rare classes to compensate for severe class imbalance, making the effective mini-batch distribution approximately uniform across classes. However, it is computationally wasteful: convolutions over heavily overlapping patches are recomputed many times.
+
+\subsubsection{Full-Image Training}
+
+In full-image (end-to-end) training, the entire segmentation network — encoder, decoder, and all — is trained directly on annotated images. The loss is the sum of per-pixel cross-entropy losses over all pixels in the image:
+\[
+  \mathcal{L}(\theta) = \arg\min_\theta \sum_{(i,j)\in\Omega} \mathcal{L}_{\text{CE}}\!\left(f_\theta(I)_{i,j},\, y(i,j)\right).
+\]
+This is equivalent to patch-wise training where the batch contains \emph{all} receptive fields of the image simultaneously. It avoids redundant convolution computations and naturally handles arbitrary image sizes.
+
+Two limitations arise and their standard remedies are:
+\begin{enumerate}
+  \item \textbf{Non-random spatial sampling.} Neighbouring pixels in the same image are highly correlated. To inject stochasticity, one applies a random binary mask $r(i,j) \sim \text{Bernoulli}(p)$ and minimises $\sum_{(i,j)} r(i,j)\,\mathcal{L}_{\text{CE}}$.
+  \item \textbf{Class imbalance.} Since one cannot resample patches, one instead weights the loss by class-frequency: $\sum_{(i,j)} w_c(y(i,j))\,\mathcal{L}_{\text{CE}}$.
+\end{enumerate}
+
+\begin{notebox}[Long et al.\ on full-image training]
+Long, Shelhamer, and Darrell (CVPR 2015) note that whole-image fully convolutional training is equivalent to patch-wise training where the batch contains all receptive fields of the image, but is significantly more efficient because it avoids repeating convolutional computations for overlapping regions.
+\end{notebox}
+
+%------------------------------------------------------------
+\subsection{Research Application: Semantic Segmentation with Scarce Annotations}
+\label{sec:semseg_research}
+%------------------------------------------------------------
+
+A compelling real-world scenario illustrates the challenges that arise in practice. In a biomedical application (developed in collaboration with clinical partners), the goal is to segment anatomical structures in medical images of patients. Two fundamental difficulties compound each other:
+
+\begin{itemize}
+  \item \textbf{Scarce dense annotations.} Dense pixel-level labelling takes approximately 2 hours per image, so only a handful of fully annotated images exist.
+  \item \textbf{High anatomical variability.} Different patients, and different pathologies within the same diagnostic category, exhibit substantial morphological differences that a model trained on a small sample may not generalise across.
+\end{itemize}
+
+One practical workaround is to train on \textbf{grid-sampled patch annotations}: rather than labelling every pixel, an annotator labels the class of the central pixel of patches placed at regular grid positions. This dramatically reduces annotation time while still providing supervised signal over the image. The workflow then proceeds:
+
+\begin{enumerate}
+  \item Crop patches at grid points; assign to each patch the class of its central pixel.
+  \item Train a CNN classifier on these patches.
+  \item Convolutionalise the trained classifier (replace FC layers with $1\times 1$ convolutions).
+  \item Apply shift-and-stitch to obtain full-resolution segmentation maps.
+\end{enumerate}
+
+This approach achieves efficient inference from a vanilla classification network trained on fewer than 31\,000 patches of size $200\times 200$, with segmentation quality competitive with direct full-annotation methods.
+
+%------------------------------------------------------------
+\subsection{Recap: Lecture 11 Key Points}
+\label{sec:recap_semseg}
+%------------------------------------------------------------
+
+\begin{tcolorbox}[colback=WarningRedBg,colframe=WarningRed,boxrule=0.8pt,arc=3pt]
+\textbf{Lecture 11 — Summary (Exam Checklist)}
+\begin{enumerate}
+  \item \textbf{Semantic segmentation}: assign a class label to every pixel; output is $\hat{Y} \in \mathcal{C}^{H\times W}$; differs from instance segmentation (no per-instance distinction).
+  \item \textbf{Plain vanilla}: slide a CNN classifier over all patches — correct but computationally intractable; patch size is a difficult hyperparameter.
+  \item \textbf{FC-CNN}: replace FC layers with equivalent $1\times1$ convolutions; accepts arbitrary input size; outputs a low-resolution heatmap. Migration is weight-preserving: reshape FC weight matrix to convolutional filter tensor.
+  \item \textbf{Upsampling strategies}: (i) direct bilinear — fast but blurry; (ii) shift-and-stitch — full-resolution but rigid; (iii) learned transpose convolution — flexible, data-driven, recommended.
+  \item \textbf{Transpose convolution}: learnable upsampling; kernel size $k$, stride $s$ maps $n \to s\cdot n$; initialised as bilinear interpolation; also called fractionally strided convolution (never ``deconvolution'').
+  \item \textbf{Encoder--decoder}: contracting path (semantic richness) + expanding path (spatial recovery); symmetric; skip connections concatenate encoder and decoder feature maps at matching scales.
+  \item \textbf{U-Net}: 23-layer fully convolutional encoder--decoder with skip connections; trained on $\sim$30 images with elastic deformation augmentation; weighted loss $w(i,j) = w_c + w_0\exp(-(d_1+d_2)^2/2\sigma^2)$ to handle touching cells.
+  \item \textbf{Pixel-wise loss}: sum categorical cross-entropy over all pixels; each image is a mini-batch of $|\Omega|$ loss evaluations.
+  \item \textbf{Full-image vs.\ patch-wise training}: full-image is more efficient (no redundant convolutions); patch-wise allows class resampling; full-image uses loss weighting and random masking to compensate.
+\end{enumerate}
+\end{tcolorbox}
+
+
+%=========================================================
+\section{Localization and Object Detection}
+\label{sec:localization_detection}
+%=========================================================
+
+The previous lecture addressed \emph{semantic segmentation}, which assigns a class label to \emph{every} pixel.  This lecture takes a different perspective: instead of labelling every pixel, we want to \emph{locate} one or more objects in an image using \term{bounding boxes}, and possibly identify them by category.  We will progress through four increasingly general tasks — classification, localization, multi-task classification-localization, and full object detection — before studying the landmark architectures (R-CNN, Fast R-CNN, Faster R-CNN, YOLO, Mask R-CNN, and FPN) that made real-time detection practical.
+
+%------------------------------------------------------------
+\subsection{A Hierarchy of Visual Recognition Tasks}
+\label{sec:task_hierarchy}
+%------------------------------------------------------------
+
+It is useful to arrange the visual recognition tasks on a spectrum of increasing complexity.
+
+\begin{defbox}{Classification}
+The input image contains \emph{one} dominant object.  The task is to assign a single label $l \in \Lambda$ from a fixed set of categories $\Lambda = \{\text{cat}, \text{dog}, \ldots\}$.  The output is a discrete class, and the training signal is the categorical cross-entropy.
+\end{defbox}
+
+\begin{defbox}{Localization}
+The input image still contains a \emph{single} dominant object, but the network must additionally predict a \term{bounding box} $(x, y, w, h)$ that tightly encloses it.  Formally:
+\[
+  \mathbf{I} \;\longrightarrow\; (x,\,y,\,w,\,h),
+  \qquad \mathbf{I} \in \mathbb{R}^{R \times C \times 3}.
+\]
+This is a \emph{regression} problem on 4 real-valued coordinates: the top-left corner $(x,y)$ and the box dimensions $(w,h)$.
+\end{defbox}
+
+\begin{defbox}{Object Detection}
+There are now \emph{multiple} objects in the image, each requiring both a class label and a bounding box.  The number of objects is unknown and varies per image:
+\[
+  \mathbf{I} \;\longrightarrow\; \bigl\{(x, y, h, w, l)_1,\; \ldots,\; (x, y, h, w, l)_N\bigr\}.
+\]
+This is the most general and most challenging setting.
+\end{defbox}
+
+%------------------------------------------------------------
+\subsection{Bounding Box Regression}
+\label{sec:bb_regression}
+%------------------------------------------------------------
+
+Training a network to predict a single bounding box is conceptually straightforward: replace the classification head with a \emph{regression head} containing 4 output neurons (one per coordinate) with \emph{linear activations}, and optimise a regression loss.
+
+\begin{thmbox}{Training a Bounding Box Regressor}
+\begin{enumerate}
+  \item Build a CNN backbone (e.g.\ a pretrained EfficientNet-B0) and replace the final classifier with a linear layer of size 4.
+  \item Use a regression loss such as the $\ell_2$ (MSE) or $\ell_1$ loss between predicted and ground-truth coordinates:
+  \[
+    \mathcal{R} = \bigl\|\,(\hat{x}, \hat{y}, \hat{w}, \hat{h}) - (x, y, w, h)\,\bigr\|_2^2.
+  \]
+  \item All 4 outputs use \emph{linear} activation functions, not softmax.
+\end{enumerate}
+\end{thmbox}
+
+A minimal PyTorch implementation looks as follows.
+
+\begin{lstlisting}[style=pythonstyle, caption={Bounding box regressor in PyTorch}]
+class BoxRegressorModel(nn.Module):
+    def __init__(self, dropout_rate=0.5):
+        super().__init__()
+        self.backbone = torchvision.models.efficientnet_b0()
+        in_features = self.backbone.classifier[1].in_features
+        # 4 linear output neurons for (x, y, w, h)
+        self.backbone.classifier = nn.Sequential(
+            nn.Dropout(dropout_rate),
+            nn.Linear(in_features, 4)
+        )
+
+# Instantiate, optimizer, and loss
+box_model     = BoxRegressorModel().to(device)
+box_optimizer = torch.optim.Adam(box_model.parameters(), lr=LEARNING_RATE)
+box_criterion = nn.MSELoss()
+\end{lstlisting}
+
+\subsubsection{Application: Human Pose Estimation}
+
+Bounding box regression generalises immediately to predicting \emph{any} set of spatial coordinates.  \term{Human pose estimation} frames the task as regressing the locations of $k$ body joints, yielding a $2k$-dimensional output vector.  The seminal DeepPose paper (Toshev \& Szegedy, CVPR 2014) trained an AlexNet-like network to predict 14 joint locations (28 output neurons) directly from the full image, using an $\ell_2$ regression loss with data augmentation (translations and flips) to reduce overfitting.
+
+\begin{insightbox}[Why predict from the full image?]
+Feeding the full image to the network lets it capture the \emph{global context} of each body joint — the position of the shoulder constrains the likely position of the elbow — without requiring any explicit part model or graphical model.  The approach is simple to design and train, and can be improved by cascading a second network that refines each joint position within a crop centred on the initial estimate.
+\end{insightbox}
+
+Modern systems such as \textbf{OpenPose} (Cao et al., CVPR 2017) extend this idea to \emph{multi-person} settings using Part Affinity Fields to associate detected joints with individual people, enabling real-time full-body pose estimation.
+
+%------------------------------------------------------------
+\subsection{Multi-Task Learning: Classification \emph{and} Localization}
+\label{sec:multitask}
+%------------------------------------------------------------
+
+A natural next step is to train a network to solve \emph{both} classification and localization simultaneously.  This is an instance of \term{multi-task learning}: the two outputs have different natures (categorical vs.\ continuous), so the network needs two specialised heads sharing a common backbone.
+
+\begin{defbox}{The Multi-Task Problem}
+Given an image $\mathbf{I}$, simultaneously predict:
+\begin{itemize}
+  \item a class label $l \in \Lambda$ (classification head, softmax output);
+  \item bounding box coordinates $(x, y, w, h)$ (regression head, linear output).
+\end{itemize}
+The training set must provide both a label \emph{and} a bounding box for every image.
+\end{defbox}
+
+\subsubsection{The Multi-Task Loss}
+
+Because gradient descent requires a \emph{scalar} loss, the two per-task losses must be merged into one.  The standard approach is a \term{convex combination}:
+\[
+  \mathcal{L}(x) \;=\; \alpha\,\mathcal{S}(x) \;+\; (1-\alpha)\,\mathcal{R}(x), \qquad \alpha \in [0,1],
+\]
+where $\mathcal{S}$ is the softmax (categorical cross-entropy) classification loss and $\mathcal{R}$ is the regression loss (e.g.\ MSE).  The scalar $\alpha$ is a \emph{hyperparameter}, but with an important subtlety.
+
+\begin{warnbox}[Choosing $\alpha$]
+$\alpha$ is \textbf{not} a standard hyperparameter like learning rate.  Changing $\alpha$ changes the \emph{definition} of the loss, so the absolute value of the loss is not comparable across different values of $\alpha$.  Cross-validation on the combined loss is therefore meaningless.  In practice, one fixes $\alpha$ based on prior experience or tunes it using a secondary evaluation metric (e.g.\ mean IoU on a held-out set).  It is always preferable to fine-tune the two heads \emph{jointly} rather than sequentially: joint training allows the shared backbone to benefit from both learning signals simultaneously.
+\end{warnbox}
+
+\subsubsection{PyTorch Architecture and Loss}
+
+\begin{lstlisting}[style=pythonstyle, caption={Multi-task model with classification and regression heads}]
+class MultiTaskModel(nn.Module):
+    def __init__(self, num_classes=2, dropout_rate=0.5):
+        super().__init__()
+        backbone = torchvision.models.efficientnet_b0()
+        self.features = backbone.features
+        self.avgpool  = backbone.avgpool
+        in_features   = backbone.classifier[1].in_features
+        self.classifier_head = nn.Sequential(
+            nn.Dropout(dropout_rate),
+            nn.Linear(in_features, num_classes)
+        )
+        self.regressor_head = nn.Sequential(
+            nn.Dropout(dropout_rate),
+            nn.Linear(in_features, 4)   # (x1, y1, x2, y2)
+        )
+
+    def forward(self, x):
+        features     = self.avgpool(self.features(x))
+        features     = torch.flatten(features, 1)
+        class_output = self.classifier_head(features)
+        bbox_output  = self.regressor_head(features)
+        return class_output, bbox_output
+\end{lstlisting}
+
+\begin{lstlisting}[style=pythonstyle, caption={Multi-task loss computation}]
+cls_criterion = nn.CrossEntropyLoss()
+box_criterion = nn.MSELoss()
+
+class_output, bbox_output = model(img)
+cls_loss   = cls_criterion(class_output, label)
+box_loss   = box_criterion(bbox_output, box)
+total_loss = lambda_cls * cls_loss + lambda_box * box_loss
+\end{lstlisting}
+
+%------------------------------------------------------------
+\subsection{Object Detection: the Full Problem}
+\label{sec:object_detection}
+%------------------------------------------------------------
+
+Object detection generalises localization to an \emph{unknown and varying} number of objects per image.  The output is a \emph{set} of tuples $(x, y, h, w, l)$, one per detected instance.  This creates two fundamental challenges:
+
+\begin{enumerate}
+  \item The network must produce a \emph{variable-length} output, which is architecturally non-trivial.
+  \item The network must be evaluated and trained with a loss that accounts for missing detections, false positives, and imperfect localization simultaneously.
+\end{enumerate}
+
+\subsubsection{Measuring Detection Quality: Intersection over Union}
+
+Before discussing architectures, we need a way to compare a predicted bounding box $\hat{B}$ to a ground-truth box $B$.  The standard measure is \term{Intersection over Union (IoU)}:
+\[
+  \mathrm{IoU}(B, \hat{B}) \;=\; \frac{|B \cap \hat{B}|}{|B \cup \hat{B}|} \;\in\; [0,1].
+\]
+A perfect prediction gives IoU $= 1$; disjoint boxes give IoU $= 0$.  Typical evaluation thresholds are IoU $\geq 0.5$ (lenient) or IoU $\geq 0.75$ (strict).
+
+The overall \term{detection loss} $\mathcal{L}(y, \hat{y})$ aggregates across all predicted and ground-truth boxes and penalises:
+\begin{itemize}
+  \item \textbf{Missed objects} (false negatives): ground-truth boxes with no sufficiently overlapping prediction.
+  \item \textbf{Spurious detections} (false positives): predictions with low IoU against any ground-truth box.
+  \item \textbf{Poor localization}: predictions with correct class but low IoU.
+\end{itemize}
+
+%------------------------------------------------------------
+\subsection{The Sliding Window Approach (Baseline)}
+\label{sec:sliding_window_detection}
+%------------------------------------------------------------
+
+The simplest conceivable approach to detection is the \term{sliding window}: slide a fixed-size window across the image at multiple positions and scales, classify each crop with a pretrained CNN (adding a \emph{background} class), and report windows classified as non-background.
+
+\begin{notebox}[Background class]
+Unlike pure localization, detection requires a \textbf{background} class so that the network can output ``no object here'' for windows that do not contain any instance.
+\end{notebox}
+
+While correct in principle, the sliding window has severe drawbacks:
+\begin{itemize}
+  \item \textbf{Computational inefficiency}: convolutional computation is repeated independently for every overlapping crop; there is no feature sharing.
+  \item \textbf{Scale ambiguity}: objects can appear at any size, so many window sizes must be tried.
+  \item \textbf{Combinatorial explosion}: for a $1000 \times 2000$ image and even a moderate number of scales and strides, the number of crops to process is enormous.
+\end{itemize}
+On the positive side, no retraining is required — any pretrained classifier can be repurposed.  But the inefficiency of sliding windows motivated the \emph{region proposal} paradigm.
+
+%------------------------------------------------------------
+\subsection{Region-Based CNN (R-CNN)}
+\label{sec:rcnn}
+%------------------------------------------------------------
+
+R-CNN (Girshick et al., CVPR 2014) introduced the idea of coupling an external \term{region proposal algorithm} with a CNN feature extractor.
+
+\begin{thmbox}{R-CNN Pipeline}
+\begin{enumerate}
+  \item \textbf{Region proposal}: apply an external algorithm (e.g.\ Selective Search) to the image to generate $\sim$2000 candidate regions with very high recall but low precision.
+  \item \textbf{Warping}: resize each proposed region to a fixed size (e.g.\ $227 \times 227$) required by the fully connected layers of the CNN.
+  \item \textbf{Feature extraction}: run a pretrained AlexNet on each warped region to obtain a 2048-dimensional feature vector.
+  \item \textbf{Classification}: train a per-class linear SVM on the extracted features to classify each region (including a background class).
+  \item \textbf{Bounding box refinement}: train a per-class linear regression head to correct the bounding box estimate from the region proposal.
+\end{enumerate}
+\end{thmbox}
+
+Although R-CNN achieved large accuracy gains over the prior state of the art, it suffered from critical limitations:
+\begin{itemize}
+  \item \textbf{Non-end-to-end training}: the CNN, SVMs, and BB regressors were trained with different objectives and separately (no joint gradient flow).
+  \item \textbf{Slow training}: features had to be stored on disk, and training took $\sim$84 hours.
+  \item \textbf{Slow inference}: the CNN had to be evaluated on each of the $\sim$2000 proposals independently, with no feature reuse; inference on VGG16 took $\sim$47 seconds per image.
+\end{itemize}
+
+\begin{warnbox}[Efficiency is crucial in detection]
+In object detection, inference speed directly determines applicability.  A 47 s/image detector is useless for autonomous driving or any real-time scenario.  This inefficiency drove the design of Fast R-CNN and Faster R-CNN.
+\end{warnbox}
+
+%------------------------------------------------------------
+\subsection{Fast R-CNN}
+\label{sec:fast_rcnn}
+%------------------------------------------------------------
+
+Fast R-CNN (Girshick, ICCV 2015) eliminated the redundant per-proposal convolution by reversing the order of the operations: instead of extracting features from each warped region independently, the \emph{entire image} is processed once by the convolutional backbone, and regions are then cropped from the resulting \emph{feature maps}.
+
+\begin{thmbox}{Fast R-CNN Pipeline}
+\begin{enumerate}
+  \item Feed the whole image to a CNN backbone (e.g.\ VGG16 up to the \texttt{conv5} layer) to compute a single set of convolutional feature maps.
+  \item Project the region proposals (still from an external algorithm) onto the feature maps.
+  \item \textbf{ROI Pooling}: for each projected region of interest (ROI), extract a fixed-size $H \times W$ activation by dividing the ROI into an $H \times W$ spatial grid and applying max-pooling within each cell.  This produces a fixed-length vector regardless of ROI size.
+  \item Feed the pooled features to fully connected layers that simultaneously predict:
+    \begin{itemize}
+      \item class probabilities via softmax (replacing the external SVM);
+      \item bounding box offsets via a linear regression head.
+    \end{itemize}
+  \item Optimise the combined multi-task loss end-to-end.
+\end{enumerate}
+\end{thmbox}
+
+The crucial advantages over R-CNN are:
+\begin{itemize}
+  \item Convolutional computation is performed \textbf{once} per image and \textbf{shared} across all proposals.
+  \item The whole network (backbone + classifier + regressor) is trained \textbf{end-to-end} with a single loss, enabling back-propagation through the ROI pooling layer.
+  \item Test time is dramatically reduced.
+\end{itemize}
+
+After Fast R-CNN, the bottleneck shifted entirely to the external region proposal step (e.g.\ Selective Search), which is not learned and contributes the majority of the total test time.
+
+%------------------------------------------------------------
+\subsection{Faster R-CNN}
+\label{sec:faster_rcnn}
+%------------------------------------------------------------
+
+Faster R-CNN (Ren et al., NIPS 2015) resolved the remaining bottleneck by replacing the external region proposal algorithm with a \term{Region Proposal Network (RPN)} that operates on the \emph{same} convolutional feature maps as the detection head, enabling the entire pipeline to be trained end-to-end.
+
+\subsubsection{Region Proposal Network (RPN)}
+
+The RPN is a small fully-convolutional network that slides over the last convolutional feature map (spatial dimensions $r_b \times c_b$) and, for each spatial location, predicts a set of $k$ \term{anchor boxes} — candidate regions of predefined scales and aspect ratios (e.g.\ $k = 9$: 3 scales $\times$ 3 aspect ratios).
+
+\begin{defbox}{Anchor Boxes}
+An \textbf{anchor box} $A_i$ is a reference bounding box of a specific size and aspect ratio centred at a given spatial location.  For each anchor, the RPN predicts:
+\begin{itemize}
+  \item \textbf{Objectness score}: probability that the anchor contains \emph{any} object (a binary classification — object vs.\ background).  The network outputs $2k$ probability estimates per spatial location via sigmoid activations.
+  \item \textbf{Bounding box refinement}: four deltas $(\delta x, \delta y, \delta w, \delta h)$ to correct the anchor toward the actual object boundary.  The $4k$ correction terms are expressed in log space to ease convergence.
+\end{itemize}
+\end{defbox}
+
+\subsubsection{RPN Architecture}
+
+\begin{enumerate}
+  \item An \textbf{intermediate convolutional layer} ($3\times 3$ filter, 512 channels) embeds each spatial location into a latent representation: output shape $r_b \times c_b \times 512$.
+  \item A \textbf{cls branch} (two $1\times 1$ convolutions) outputs $2k$ objectness probabilities per location.
+  \item A \textbf{reg branch} ($1\times 1$ convolutions) outputs $4k$ bounding box deltas per location.
+  \item \textbf{Non-maximum suppression (NMS)} on the corrected proposals (ranked by objectness score, pruned by IoU overlap) retains the top $n_\text{prop}$ proposals (typically 300) passed to the detection head.
+\end{enumerate}
+
+\subsubsection{Detection Head}
+
+The detection head is identical to Fast R-CNN:
+\begin{itemize}
+  \item ROI Pooling (or the more accurate ROI Align) extracts a fixed-size feature for each of the $n_\text{prop}$ proposals.
+  \item A \textbf{cls head} outputs $L$ class probabilities (including background).
+  \item A \textbf{bb head} outputs $4 \times (L-1)$ bounding box corrections — one 4-tuple per non-background class.
+\end{itemize}
+
+\subsubsection{Training}
+
+Faster R-CNN is trained with \textbf{four losses} combined in a weighted sum:
+\begin{enumerate}
+  \item RPN objectness classification loss.
+  \item RPN bounding box regression loss.
+  \item Detection head classification loss.
+  \item Detection head bounding box regression loss.
+\end{enumerate}
+
+A four-step alternating training procedure is used in practice:
+\begin{enumerate}
+  \item Train RPN alone (frozen backbone, multi-task cls + reg loss).
+  \item Train Fast R-CNN using proposals from the trained RPN (fine-tune the whole network including backbone).
+  \item Fine-tune the RPN cascaded to the updated backbone.
+  \item Freeze backbone and RPN; fine-tune only the detection head layers.
+\end{enumerate}
+
+\subsubsection{Inference and Performance}
+
+At test time, the top $\sim$300 anchors by objectness score are fed to the detection head.  Faster R-CNN achieves $\sim$0.2 seconds per image on VGG16, compared to 47 s for R-CNN, while improving detection accuracy.  It remains a \textbf{two-stage detector}: stage 1 generates proposals (backbone + RPN), stage 2 classifies them (ROI pooling + detection head).
+
+\begin{insightbox}[Why rectangular anchors?]
+In principle, anchors can have arbitrary shapes (ellipses, rotated boxes).  In practice, rectangular axis-aligned boxes are universally preferred because computing the IoU between two rectangles has a simple closed-form expression, making the loss fast to evaluate and differentiate.  Non-rectangular shapes do not admit such simple intersection formulas.
+\end{insightbox}
+
+%------------------------------------------------------------
+\subsection{One-Stage Detectors: YOLO and SSD}
+\label{sec:yolo}
+%------------------------------------------------------------
+
+R-CNN-based methods are \term{two-stage detectors}: proposals are generated first, then classified.  This two-stage design is accurate but inherently sequential.  \term{One-stage (single-shot) detectors} collapse the two stages into a single forward pass, trading some accuracy for significant speed.
+
+The two landmark one-stage architectures are:
+\begin{itemize}
+  \item \textbf{YOLO} (You Only Look Once) — Redmon et al., CVPR 2016.
+  \item \textbf{SSD} (Single Shot MultiBox Detector) — Liu et al., ECCV 2016.
+\end{itemize}
+
+\subsubsection{YOLO}
+
+YOLO reframes detection as a single \emph{regression problem} from raw image pixels to bounding box coordinates and class probabilities.
+
+\begin{thmbox}{YOLO Pipeline}
+\begin{enumerate}
+  \item Divide the image into a coarse $S \times S$ grid (e.g.\ $7 \times 7$).
+  \item Associate $B$ anchor boxes with each cell.
+  \item For each of the $S \times S \times B$ anchors, predict:
+    \begin{itemize}
+      \item the bounding box offset $(dx, dy, dh, dw)$ relative to the anchor;
+      \item an \emph{objectness score};
+      \item the classification score vector over $C$ categories.
+    \end{itemize}
+  \item The final output tensor has shape $S \times S \times B \times (5 + C)$.
+  \item The entire prediction is computed in a \textbf{single forward pass} through one large CNN.
+\end{enumerate}
+\end{thmbox}
+
+YOLO's formulation is essentially the same as the RPN in Faster R-CNN, extended to also predict class scores and performed in one shot.  The trade-off is well-established empirically: two-stage detectors (Faster R-CNN) achieve higher accuracy, while one-stage detectors (YOLO, SSD) achieve higher frame rates.  YOLOv3 and later versions significantly closed this accuracy gap.
+
+%------------------------------------------------------------
+\subsection{Instance Segmentation}
+\label{sec:instance_seg}
+%------------------------------------------------------------
+
+\term{Instance segmentation} goes beyond bounding boxes: for each detected object, it produces a \emph{pixel-level mask} indicating exactly which pixels belong to that instance.  It combines the challenges of:
+
+\begin{itemize}
+  \item \textbf{Object detection}: there are multiple instances, each requiring a bounding box and a class label.
+  \item \textbf{Semantic segmentation}: each detected instance requires a fine-grained pixel mask, but masks must be assigned to \emph{individual instances} rather than merged into a single class map.
+\end{itemize}
+
+Formally, the output per image is a set of tuples $\{(x, y, h, w, l, S)_i\}$ where $S$ is the set of foreground pixels within bounding box $i$.
+
+\subsubsection{Mask R-CNN}
+
+Mask R-CNN (He, Gkioxari, Dollár, Girshick, ICCV 2017) extends Faster R-CNN with a third output branch — the \term{mask head} — added in parallel to the existing classification and bounding box branches.
+
+\begin{thmbox}{Mask R-CNN Architecture}
+\begin{enumerate}
+  \item \textbf{Shared backbone + RPN}: identical to Faster R-CNN; produces $n_\text{prop}$ ROI proposals.
+  \item \textbf{ROI Align}: a more precise variant of ROI Pooling that avoids quantization artifacts by using bilinear interpolation; produces a fixed $14 \times 14$ feature map per ROI.
+  \item \textbf{Classification head}: predicts $C$ class scores (as in Faster R-CNN).
+  \item \textbf{Bounding box head}: predicts $4C$ box corrections (as in Faster R-CNN).
+  \item \textbf{Mask head}: a small FCN applied to each ROI that predicts a $28 \times 28$ binary mask \emph{for each of the $C$ classes}.  During training, only the mask for the ground-truth class contributes to the mask loss; this decouples mask prediction from classification and avoids competition between classes.
+\end{enumerate}
+The total training loss is:
+\[
+  \mathcal{L} = \mathcal{L}_\text{cls} + \mathcal{L}_\text{box} + \mathcal{L}_\text{mask},
+\]
+where $\mathcal{L}_\text{mask}$ is a per-pixel binary cross-entropy loss averaged over the ROI.
+\end{thmbox}
+
+A key design insight is that the mask branch is \emph{independent} of the classification branch: the network predicts masks for all classes and selects the mask of the predicted class at inference time.  This separation allows mask quality to be maximised without interference from the classification signal.
+
+Mask R-CNN can also incorporate additional heads, e.g.\ for \textbf{human pose estimation} by predicting keypoint heatmaps as an additional output branch.  The same framework, trained on COCO (200,000 images, 80 categories, with per-person joint annotations), achieves compelling results on both instance segmentation and pose estimation simultaneously.
+
+%------------------------------------------------------------
+\subsection{Feature Pyramid Networks (FPN)}
+\label{sec:fpn}
+%------------------------------------------------------------
+
+A fundamental challenge in detection is \term{scale variation}: objects can appear at vastly different sizes in the same image.  A backbone CNN naturally produces feature maps of decreasing spatial resolution and increasing semantic richness as depth increases.  Shallow layers have high spatial resolution but low semantic content; deep layers have rich semantics but coarse spatial resolution.
+
+\term{Feature Pyramid Networks} (Lin et al., CVPR 2017) address this by constructing a \emph{multi-scale feature hierarchy} that combines the best of both worlds.
+
+\subsubsection{Architecture}
+
+FPN has three components:
+
+\begin{enumerate}
+  \item \textbf{Bottom-up pathway}: the standard forward pass of any CNN backbone (e.g.\ ResNet).  Feature maps at each resolution stage $\{C_2, C_3, C_4, C_5\}$ are extracted, each with half the spatial resolution of the previous.
+  \item \textbf{Top-down pathway}: starting from the deepest (semantically richest) feature map $C_5$, features are progressively \emph{upsampled} by a factor of 2 at each level.
+  \item \textbf{Lateral connections}: at each resolution level, a $1\times 1$ convolution reduces the channel dimension of the bottom-up features to match the top-down features, and the two are added \emph{element-wise}.  A $3\times 3$ convolution is then applied to reduce aliasing artifacts.  This produces the output pyramid $\{P_2, P_3, P_4, P_5\}$.
+\end{enumerate}
+
+\begin{defbox}{FPN Formulation}
+For a ROI of width $w$ and height $h$, it is assigned to pyramid level $k$ according to:
+\[
+  k \;=\; \left\lfloor k_0 + \log_2\!\Bigl(\sqrt{wh}\,/\,224\Bigr) \right\rfloor,
+\]
+where $k_0 = 4$ is the base level for a $224\times 224$ ROI.  Larger objects are assigned to coarser (deeper) pyramid levels; smaller objects to finer (shallower) levels.  ROI Pooling is then applied on the selected level $P_k$.
+\end{defbox}
+
+\subsubsection{FPN vs.\ Other Multi-Scale Architectures}
+
+Architectures like U-Net also extract features at multiple resolutions via skip connections, but they produce a \emph{single} output feature map for inference.  FPN, by contrast, makes \emph{independent predictions at each pyramid level}, which is critical for detecting objects across different scales.  FPN is not a detector by itself; it is a \emph{feature extractor} that plugs into any region-based detector (RPN, Fast R-CNN, Faster R-CNN) to give it multi-scale capability without significantly increasing inference time.
+
+%------------------------------------------------------------
+\subsection{Recap: Lecture 12 Key Points}
+\label{sec:recap_detection}
+%------------------------------------------------------------
+
+\begin{tcolorbox}[colback=WarningRedBg,colframe=WarningRed,boxrule=0.8pt,arc=3pt]
+\textbf{Lecture 12 — Summary (Exam Checklist)}
+\begin{enumerate}
+  \item \textbf{Task hierarchy}: classification $\to$ localization (single BB) $\to$ multi-task classification + localization $\to$ object detection (multiple instances, variable number).
+  \item \textbf{Bounding box regression}: 4-neuron linear head; $\ell_1$ or $\ell_2$ regression loss; generalises to pose estimation ($2k$ outputs for $k$ joints).
+  \item \textbf{Multi-task loss}: $\mathcal{L} = \alpha\,\mathcal{S} + (1-\alpha)\,\mathcal{R}$; $\alpha$ is not a standard hyperparameter (loss scale changes with $\alpha$); always train both heads jointly.
+  \item \textbf{IoU}: $\mathrm{IoU}(B, \hat{B}) = |B\cap\hat{B}|/|B\cup\hat{B}|$; universal metric for bounding box quality; enables NMS.
+  \item \textbf{Sliding window}: conceptually correct, computationally intractable; no feature sharing; scale ambiguity.
+  \item \textbf{R-CNN}: external region proposals (Selective Search) + CNN features + SVM + BB regressor; not end-to-end; 47 s/image.
+  \item \textbf{Fast R-CNN}: one CNN forward pass over whole image; ROI Pooling extracts fixed-size features from feature maps; end-to-end training; bottleneck moves to region proposal.
+  \item \textbf{Faster R-CNN}: RPN replaces external proposals; $k$ anchors per location with objectness + BB delta heads; NMS retains top $n_\text{prop}$ proposals; full end-to-end training with 4 losses; $\sim$0.2 s/image.
+  \item \textbf{YOLO/SSD}: one-stage detectors; single forward pass; output tensor $S\times S\times B\times(5+C)$; faster but historically less accurate than two-stage.
+  \item \textbf{Mask R-CNN}: extends Faster R-CNN with a mask head (per-ROI binary mask per class); ROI Align instead of ROI Pooling; simultaneous bounding box + class + mask prediction.
+  \item \textbf{FPN}: bottom-up backbone + top-down upsampling + lateral connections; outputs pyramid $\{P_k\}$; ROI assigned to level based on size; multi-scale detection without rerunning backbone.
+\end{enumerate}
+\end{tcolorbox}
+
 \end{document}
