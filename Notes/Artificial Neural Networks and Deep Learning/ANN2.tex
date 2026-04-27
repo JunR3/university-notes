@@ -3438,4 +3438,949 @@ Architectures such as U-Net also combine features at multiple resolutions via sk
 \end{enumerate}
 \end{tcolorbox}
 
+
+%=========================================================
+%  Lecture 13 – Recurrent Neural Networks
+%=========================================================
+\newpage
+\section{Recurrent Neural Networks}
+\label{sec:rnn}
+
+%------------------------------------------------------------
+\subsection{Motivation: From Static to Sequential Data}
+\label{sec:rnn_motivation}
+%------------------------------------------------------------
+
+All the architectures we have discussed so far — perceptrons, fully connected networks, convolutional networks — operate on \emph{static} inputs: each example $\mathbf{x}$ is fed to the network independently, and there is no notion of time or order among examples. This assumption is natural when dealing with, say, individual images or fixed-length feature vectors.
+
+Many real-world problems, however, involve data that is \emph{sequential} by nature. Consider natural language: the meaning of a word depends on the words that preceded it. Consider audio: a phoneme carries meaning only in the context of adjacent phonemes. Consider video, financial time-series, biological signals — in all these domains the data arrives as a sequence $X_0, X_1, X_2, \ldots, X_t$ and the order among observations is not merely incidental but is the very carrier of information.
+
+Formally, a sequential dataset is a collection of variable-length sequences
+\[
+  \mathcal{D} = \bigl\{\, (\mathbf{X}^{(n)}, \mathbf{y}^{(n)}) \bigr\}_{n=1}^{N},
+  \qquad \mathbf{X}^{(n)} = (X_0^{(n)}, X_1^{(n)}, \ldots, X_{T_n}^{(n)}),
+\]
+where $T_n$ may differ across examples. Each element $X_t \in \mathbb{R}^I$ is an $I$-dimensional observation at time step $t$.
+
+The central modelling challenge is: how do we incorporate the \emph{history} of past observations when predicting the output at time $t$?
+
+%------------------------------------------------------------
+\subsection{A Taxonomy of Sequential Models}
+\label{sec:seq_models_taxonomy}
+%------------------------------------------------------------
+
+Two broad families of approaches exist for handling sequential data, distinguished by whether they maintain an internal \emph{memory} across time steps.
+
+\subsubsection{Memoryless Models}
+
+These methods represent the entire history via a fixed-size window of past observations and process each window independently.
+
+\begin{defbox}{Autoregressive Models}
+An \term{autoregressive model} of order $p$ predicts the next observation from the $p$ most recent ones using \emph{delay taps}:
+\[
+  \hat{X}_t \;=\; f\bigl(X_{t-1},\, X_{t-2},\, \ldots,\, X_{t-p}\bigr),
+\]
+where $f$ is a linear or nonlinear function. The model has no internal state — if $p$ is fixed, only a finite window of history is used.
+\end{defbox}
+
+\begin{defbox}{Feedforward Neural Networks on Sequences}
+A natural generalisation of autoregressive models replaces the linear function $f$ with a multi-layer feedforward network. The inputs are the $p$ delay-tapped observations; hidden layers learn nonlinear combinations of the window. While this gives greater representational power, the fundamental limitation remains: the context window is fixed at $p$ steps, and any dependency beyond $p$ time steps is invisible to the model.
+\end{defbox}
+
+\subsubsection{Models with Memory}
+
+Rather than truncating history to a window, these models maintain a \emph{hidden state} $\mathbf{h}_t$ (also called the \emph{context} or \emph{cell state}) that is updated at every time step and implicitly encodes a summary of the entire past. The output at time $t$ is then a function of both $X_t$ and $\mathbf{h}_{t-1}$.
+
+Three classical architectures belong to this family:
+
+\begin{itemize}
+  \item \textbf{Linear Dynamical Systems (LDS).} The hidden state $\mathbf{h}_t$ is real-valued and Gaussian, and all transitions are linear. The LDS is tractable by Kalman filtering but incapable of modelling nonlinear dynamics.
+
+  \item \textbf{Hidden Markov Models (HMM).} The hidden state is \emph{discrete}, taking values in a finite set of $K$ states. State transitions are governed by a stochastic transition matrix $A_{ij} = P(h_t = j \mid h_{t-1} = i)$, and observations are stochastic functions of the hidden state. Efficient inference is possible via the Viterbi or forward-backward algorithms. However, the discrete state space limits the information that can be stored.
+
+  \item \textbf{Recurrent Neural Networks (RNNs).} The hidden state is \emph{real-valued and high-dimensional}, updated by a learned \emph{nonlinear} function. This combines the continuous representation of LDS with the nonlinear dynamics of neural networks, yielding a deterministic system capable of storing rich contextual information.
+\end{itemize}
+
+\begin{insightbox}[Why RNNs?]
+The key advantage of RNNs over both LDS and HMMs is the combination of (i) a \emph{distributed} real-valued hidden state that can store exponentially more information than a discrete state of the same size, and (ii) \emph{nonlinear} state update dynamics that allow the network to learn complex temporal patterns. As Siegelmann (1995) showed, with sufficient neurons and time an RNN can compute anything that can be computed by a Turing machine.
+\end{insightbox}
+
+%------------------------------------------------------------
+\subsection{Recurrent Neural Networks: Architecture}
+\label{sec:rnn_architecture}
+%------------------------------------------------------------
+
+An RNN processes a sequence one step at a time, maintaining a hidden (context) state $\mathbf{c}_t \in \mathbb{R}^B$ that is passed from one time step to the next. At each step $t$, the network reads the current input $\mathbf{x}^t \in \mathbb{R}^I$ and updates its state:
+
+\begin{defbox}{RNN Forward Pass Equations}
+Let $B$ be the number of context units and $J$ the number of hidden units. Define:
+\begin{align}
+  h_j^t &= g_h\!\left(\sum_{i=0}^{I} w_{ji}^{(1)} x_i^t + \sum_{b=0}^{B} v_{jb}^{(1)} c_b^{t-1}\right), \label{eq:rnn_h}\\[4pt]
+  c_b^t &= g_c\!\left(\sum_{i=0}^{I} w_{bi}^{(1)} x_i^t + \sum_{b'=0}^{B} v_{bb'}^{(1)} c_{b'}^{t-1}\right), \label{eq:rnn_c}\\[4pt]
+  \hat{y}_n^t &= g_{\text{out}}\!\left(\sum_{j=0}^{J} w_{nj}^{(2)} h_j^t + \sum_{b=0}^{B} v_{nb}^{(2)} c_b^t\right), \label{eq:rnn_out}
+\end{align}
+where $w^{(1)}, w^{(2)}$ are input-to-hidden and hidden-to-output weight matrices, $v^{(1)}, v^{(2)}$ are recurrent weight matrices coupling the context state to hidden and output units, and $g_h, g_c, g_{\text{out}}$ are element-wise activation functions.
+\end{defbox}
+
+The three equations above describe the full recurrent computation:
+\begin{enumerate}
+  \item \textbf{Hidden unit activation} (Eq.~\ref{eq:rnn_h}): each hidden unit $h_j^t$ receives a weighted combination of the current input $\mathbf{x}^t$ \emph{and} the previous context state $\mathbf{c}^{t-1}$. This is the point of departure from feedforward networks — the context state serves as a \emph{memory} of the past.
+  \item \textbf{Context state update} (Eq.~\ref{eq:rnn_c}): the context state $\mathbf{c}^t$ is similarly computed from the current input and the previous context. Different cells in $\mathbf{c}$ can specialise to track different temporal features.
+  \item \textbf{Output computation} (Eq.~\ref{eq:rnn_out}): the output $\hat{\mathbf{y}}^t$ depends on both the hidden units $\mathbf{h}^t$ and the context $\mathbf{c}^t$, giving the network a richer view of its current state.
+\end{enumerate}
+
+In matrix-vector notation, collecting Eqs.~\ref{eq:rnn_h}--\ref{eq:rnn_out}:
+\[
+  \mathbf{h}^t = g_h\!\bigl(\mathbf{W}^{(1)}\mathbf{x}^t + \mathbf{V}^{(1)}\mathbf{c}^{t-1}\bigr),
+  \qquad
+  \mathbf{c}^t = g_c\!\bigl(\mathbf{W}_B^{(1)}\mathbf{x}^t + \mathbf{V}_B^{(1)}\mathbf{c}^{t-1}\bigr),
+  \qquad
+  \hat{\mathbf{y}}^t = g_{\text{out}}\!\bigl(\mathbf{W}^{(2)}\mathbf{h}^t + \mathbf{V}^{(2)}\mathbf{c}^t\bigr).
+\]
+
+\begin{notebox}
+The weight matrices $\mathbf{W}^{(1)}, \mathbf{V}^{(1)}, \mathbf{W}^{(2)}, \mathbf{V}^{(2)}$ are \emph{shared across all time steps}. This parameter sharing is what allows an RNN to process sequences of arbitrary length with a fixed number of parameters, and it is the central reason why RNNs generalise across time.
+\end{notebox}
+
+%------------------------------------------------------------
+\subsection{Backpropagation Through Time (BPTT)}
+\label{sec:bptt}
+%------------------------------------------------------------
+
+Training an RNN requires computing gradients of the loss with respect to the shared weight matrices. Because the same weights appear at every time step, the standard backpropagation algorithm must be extended to account for their repeated use — this extension is called \term{Backpropagation Through Time (BPTT)}.
+
+\subsubsection{Unrolling the Network}
+
+The key idea is to \emph{unroll} (or \emph{unfold}) the recurrent computation graph in time. For a sequence of length $T$ and an unroll depth of $U \leq T$ steps, we create $U$ copies of the RNN cell, one for each time step, all sharing the same weights. The unrolled graph is an ordinary feedforward network with tied weights, and standard backpropagation can be applied to it.
+
+\begin{algobox}{BPTT Algorithm}
+\begin{enumerate}
+  \item \textbf{Forward pass}: unroll the RNN for $U$ steps, computing $\mathbf{h}^t$, $\mathbf{c}^t$, $\hat{\mathbf{y}}^t$ at each step.
+  \item \textbf{Backward pass}: compute gradients of the loss $E$ at each time step; propagate error signals backwards through time using the chain rule.
+  \item \textbf{Gradient accumulation}: since $\mathbf{W}$ appears at every step, the total gradient is the \emph{sum} of contributions from all unrolled copies:
+  \[
+    \frac{\partial E}{\partial \mathbf{W}} = \sum_{u=0}^{U-1} \frac{\partial E}{\partial \mathbf{W}^{t-u}}.
+  \]
+  \item \textbf{Parameter update}: update the \emph{single} shared weight matrix using the average gradient:
+  \[
+    \mathbf{W}_B \leftarrow \mathbf{W}_B - \eta \cdot \frac{1}{U}\sum_{u=0}^{U-1}\frac{\partial E}{\partial \mathbf{W}_B^{t-u}},
+    \qquad
+    \mathbf{V}_B \leftarrow \mathbf{V}_B - \eta \cdot \frac{1}{U}\sum_{u=0}^{U-1}\frac{\partial E^t}{\partial \mathbf{V}_B^{t-u}}.
+  \]
+\end{enumerate}
+\end{algobox}
+
+\subsubsection{The Vanishing (and Exploding) Gradient Problem}
+\label{sec:vanishing_gradient}
+
+A critical question is: how far back in time can BPTT propagate useful gradient information? To understand the difficulty, consider a simplified single-unit RNN:
+\[
+  y^t = g\!\bigl(w^{(2)} h^t\bigr), \qquad h^t = h\!\bigl(v^{(1)} h^{t-1} + w^{(1)} x\bigr).
+\]
+The total gradient of the loss $E$ with respect to weight $w$ summed over the sequence is:
+\[
+  \frac{\partial E}{\partial w} = \sum_{t=1}^{S}\frac{\partial E^t}{\partial w}, \qquad
+  \frac{\partial E^t}{\partial w} = \sum_{k=1}^{t}\frac{\partial E^t}{\partial y^t}\frac{\partial y^t}{\partial h^t}\frac{\partial h^t}{\partial h^k}\frac{\partial h^k}{\partial w},
+\]
+where the key term is the product of Jacobians along the sequence:
+\[
+  \frac{\partial h^t}{\partial h^k} = \prod_{i=k+1}^{t}\frac{\partial h^i}{\partial h^{i-1}} = \prod_{i=k+1}^{t} v^{(1)}\, h'\!\bigl(v^{(1)} h^{i-1} + w^{(1)} x\bigr).
+\]
+Taking norms:
+\[
+  \left\|\frac{\partial h^t}{\partial h^k}\right\| \leq \bigl(\gamma_v \cdot \gamma_{h'}\bigr)^{t-k},
+\]
+where $\gamma_v = \|v^{(1)}\|$ and $\gamma_{h'} = \max |h'(\cdot)|$ is the maximum absolute value of the activation derivative.
+
+\begin{warnbox}[Vanishing Gradient]
+If $\gamma_v \cdot \gamma_{h'} < 1$, the product $\left\|\partial h^t/\partial h^k\right\|$ decays \emph{exponentially} in the temporal distance $t - k$. For sigmoid and tanh activations we always have $\gamma_{h'} \leq 1/4$ and $\gamma_{h'} \leq 1$ respectively, so for any reasonable weight scale the product shrinks exponentially. The gradient of $E^t$ with respect to inputs at time step $k \ll t$ is thus effectively zero — the network cannot learn long-range temporal dependencies.
+
+Conversely, if $\gamma_v \cdot \gamma_{h'} > 1$, gradients grow exponentially — the \term{exploding gradient} problem. In practice, exploding gradients are handled by \emph{gradient clipping} (capping the norm of the gradient vector). Vanishing gradients are the harder problem and require architectural solutions.
+\end{warnbox}
+
+\subsubsection{Solutions to the Vanishing Gradient Problem}
+
+Two principal strategies have been proposed:
+
+\textbf{1.\ Use ReLU activations with $v^{(1)} = 1$.}
+With $g(a) = \max(0, a)$, the derivative is $g'(a) = \mathbf{1}_{a > 0}$, which is either 0 or 1. Setting the recurrent weight $v^{(1)} = 1$ means the recurrent transition simply \emph{accumulates} the input, and the gradient neither grows nor shrinks. However, this eliminates forgetting and can cause representations to grow without bound.
+
+\textbf{2.\ Design memory cells with gated mechanisms (LSTMs, GRUs).}
+The principled solution — described in the next section — is to redesign the recurrent cell so that information can flow through time \emph{without} multiplication by the Jacobian, replacing the additive recurrence with a \emph{gated} mechanism that maintains a fixed-weight internal loop.
+
+%------------------------------------------------------------
+\subsection{Long Short-Term Memory (LSTM)}
+\label{sec:lstm}
+%------------------------------------------------------------
+
+The \term{Long Short-Term Memory} (LSTM) was introduced by Hochreiter \& Schmidhuber (1997) specifically to address the vanishing gradient problem. The core idea is elegant: instead of using a standard nonlinear recurrence, the LSTM maintains a \term{cell state} $\mathbf{C}_t$ that flows through time with only \emph{linear} interactions, controlled by a set of learned \term{gates}. Because the cell state is updated linearly, gradients can flow through it without exponential decay.
+
+\subsubsection{Motivation: The Memory Cell}
+
+Think of the cell state as a conveyor belt running through time. Information can be written onto it, kept in it, or erased from it, according to three gating mechanisms:
+\begin{itemize}
+  \item A \textbf{write gate} (input gate): controls how much of new information is written into the cell.
+  \item A \textbf{keep gate} (forget gate): controls how much of the old cell state is retained.
+  \item A \textbf{read gate} (output gate): controls how much of the cell state is exposed as the output hidden state.
+\end{itemize}
+Because the keep gate creates a direct, multiplication-free path through which gradients can flow from $t$ back to any earlier step, the vanishing gradient is prevented — at least for information that the network learns to preserve.
+
+\subsubsection{LSTM Equations}
+
+Let $\mathbf{x}_t \in \mathbb{R}^d$ be the input at step $t$, $\mathbf{h}_{t-1} \in \mathbb{R}^m$ the previous hidden state, and $\mathbf{C}_{t-1} \in \mathbb{R}^m$ the previous cell state. The LSTM update consists of four gates and two state updates:
+
+\begin{defbox}{LSTM Forward Pass}
+\begin{alignat}{2}
+  \mathbf{f}_t &= \sigma\!\bigl(\mathbf{W}_f[\mathbf{h}_{t-1};\mathbf{x}_t] + \mathbf{b}_f\bigr)
+    &&\quad\text{(forget gate)} \label{eq:lstm_f}\\[3pt]
+  \mathbf{i}_t &= \sigma\!\bigl(\mathbf{W}_i[\mathbf{h}_{t-1};\mathbf{x}_t] + \mathbf{b}_i\bigr)
+    &&\quad\text{(input gate)} \label{eq:lstm_i}\\[3pt]
+  \tilde{\mathbf{C}}_t &= \tanh\!\bigl(\mathbf{W}_C[\mathbf{h}_{t-1};\mathbf{x}_t] + \mathbf{b}_C\bigr)
+    &&\quad\text{(candidate values)} \label{eq:lstm_ctilde}\\[3pt]
+  \mathbf{C}_t &= \mathbf{f}_t \odot \mathbf{C}_{t-1} + \mathbf{i}_t \odot \tilde{\mathbf{C}}_t
+    &&\quad\text{(cell state update)} \label{eq:lstm_C}\\[3pt]
+  \mathbf{o}_t &= \sigma\!\bigl(\mathbf{W}_o[\mathbf{h}_{t-1};\mathbf{x}_t] + \mathbf{b}_o\bigr)
+    &&\quad\text{(output gate)} \label{eq:lstm_o}\\[3pt]
+  \mathbf{h}_t &= \mathbf{o}_t \odot \tanh(\mathbf{C}_t)
+    &&\quad\text{(hidden state)} \label{eq:lstm_h}
+\end{alignat}
+where $\sigma(\cdot)$ denotes the sigmoid function, $\odot$ is the Hadamard (element-wise) product, and $[\mathbf{a};\mathbf{b}]$ denotes vector concatenation.
+\end{defbox}
+
+Let us trace through the logic of each gate:
+
+\paragraph{Forget gate (Eq.~\ref{eq:lstm_f}).} The forget gate $\mathbf{f}_t \in [0,1]^m$ decides which dimensions of the cell state to erase. A value close to 0 means ``forget this''; a value close to 1 means ``keep this''. For instance, in a language model, when the topic shifts from one subject to another, the forget gate can clear irrelevant stored information.
+
+\paragraph{Input gate and candidate values (Eqs.~\ref{eq:lstm_i}--\ref{eq:lstm_ctilde}).} The input gate $\mathbf{i}_t$ decides which new information to write into the cell. The candidate values $\tilde{\mathbf{C}}_t$ are a tanh-squashed version of the new content, playing the role of the standard RNN hidden activation. Only the component selected by $\mathbf{i}_t$ is written.
+
+\paragraph{Cell state update (Eq.~\ref{eq:lstm_C}).} The cell state is updated by \emph{adding} two terms: (i) the fraction of the old cell state retained by the forget gate, and (ii) the new information admitted by the input gate. Crucially, this update is \emph{additive} in the cell state — the gradient of $\mathbf{C}_t$ with respect to $\mathbf{C}_{t-1}$ is simply $\mathbf{f}_t$ (a diagonal matrix), not a dense Jacobian. If the forget gate keeps values close to 1, gradients flow back through many steps without attenuation.
+
+\paragraph{Output gate (Eqs.~\ref{eq:lstm_o}--\ref{eq:lstm_h}).} The output gate $\mathbf{o}_t$ controls how much of the cell state is exposed as the hidden state $\mathbf{h}_t$. The cell state is first passed through tanh to squash it to $[-1,1]$, then filtered by $\mathbf{o}_t$.
+
+\begin{insightbox}[Why LSTMs Solve Vanishing Gradients]
+In a vanilla RNN the gradient of $\mathbf{h}_t$ with respect to $\mathbf{h}_k$ involves a product of $t-k$ weight matrices multiplied by $t-k$ Jacobians of the activation, each of which can be smaller than 1. In an LSTM the analogous quantity for the \emph{cell state} gradient involves only the element-wise product of forget gate values $\prod_{\tau=k+1}^{t}\mathbf{f}_\tau$. Since the forget gate values are learned, the network can in principle set them close to 1 for dimensions it wants to remember, allowing gradients to flow over hundreds of time steps. This is the formal reason LSTMs can capture long-range dependencies.
+\end{insightbox}
+
+\subsubsection{Comparison: Vanilla RNN vs.\ LSTM}
+
+A vanilla RNN collapses the cell state and hidden state into a single vector, updated by a single nonlinear transformation: $\mathbf{h}_t = \tanh(\mathbf{W}\mathbf{h}_{t-1} + \mathbf{U}\mathbf{x}_t)$. The LSTM replaces this single vector with two states ($\mathbf{h}_t$ and $\mathbf{C}_t$) and four learned gates that modulate information flow. The key structural difference is the additive cell state update, which provides the gradient highway through time.
+
+%------------------------------------------------------------
+\subsection{Gated Recurrent Unit (GRU)}
+\label{sec:gru}
+%------------------------------------------------------------
+
+The \term{Gated Recurrent Unit} (GRU), introduced by Cho et al.\ (2014), is a simplified variant of the LSTM that achieves comparable performance with fewer parameters.
+
+The GRU makes two simplifications relative to the LSTM:
+\begin{enumerate}
+  \item It \textbf{merges the forget and input gates} into a single \term{update gate} $\mathbf{z}_t$. The update gate simultaneously controls how much of the old state to discard and how much of the new candidate state to write.
+  \item It \textbf{merges the cell state and hidden state} into a single vector $\mathbf{h}_t$, eliminating the separate cell state.
+\end{enumerate}
+
+\begin{defbox}{GRU Forward Pass}
+\begin{alignat}{2}
+  \mathbf{z}_t &= \sigma\!\bigl(\mathbf{W}_z[\mathbf{h}_{t-1};\mathbf{x}_t]\bigr)
+    &&\quad\text{(update gate)}\\[3pt]
+  \mathbf{r}_t &= \sigma\!\bigl(\mathbf{W}_r[\mathbf{h}_{t-1};\mathbf{x}_t]\bigr)
+    &&\quad\text{(reset gate)}\\[3pt]
+  \tilde{\mathbf{h}}_t &= \tanh\!\bigl(\mathbf{W}[\mathbf{r}_t \odot \mathbf{h}_{t-1};\mathbf{x}_t]\bigr)
+    &&\quad\text{(candidate hidden state)}\\[3pt]
+  \mathbf{h}_t &= (1-\mathbf{z}_t) \odot \mathbf{h}_{t-1} + \mathbf{z}_t \odot \tilde{\mathbf{h}}_t
+    &&\quad\text{(hidden state update)}
+\end{alignat}
+\end{defbox}
+
+The \term{reset gate} $\mathbf{r}_t$ decides how much of the previous hidden state contributes to the candidate. When $\mathbf{r}_t \approx 0$, the candidate is computed almost entirely from the current input — the network effectively ``forgets'' the past for that dimension. The update gate $\mathbf{z}_t$ then interpolates between the old and new state.
+
+GRUs are computationally cheaper than LSTMs (one fewer gate, no separate cell state) and often match LSTM performance on tasks with moderate-length dependencies. On tasks requiring very long-range memory, LSTMs may have an edge.
+
+%------------------------------------------------------------
+\subsection{Deep and Bidirectional RNNs}
+\label{sec:deep_bidir_rnn}
+%------------------------------------------------------------
+
+\subsubsection{Stacked (Deep) LSTMs}
+
+Just as feedforward networks benefit from depth, RNNs can be stacked to form \term{deep recurrent networks}. In a stacked LSTM with $L$ layers, the hidden state of layer $\ell$ at time $t$ serves as the input to layer $\ell+1$:
+\[
+  \mathbf{h}_t^{(\ell)} = \mathrm{LSTM}\!\bigl(\mathbf{h}_{t-1}^{(\ell)},\; \mathbf{h}_t^{(\ell-1)}\bigr), \quad \ell = 1, \ldots, L,
+\]
+with $\mathbf{h}_t^{(0)} = \mathbf{x}_t$. Additional non-recurrent transformations (e.g.\ ReLU layers) can be inserted between the LSTM layers to increase the model's expressive power. The result is a \emph{hierarchical} representation: lower layers capture local, short-range patterns; higher layers integrate information over longer timescales.
+
+\subsubsection{Bidirectional RNNs}
+
+A standard RNN processes the sequence from left to right, so the hidden state at time $t$ depends only on $x_1, \ldots, x_t$. In many tasks — for example, named entity recognition or machine translation — the prediction at position $t$ benefits from \emph{future} context as well.
+
+\begin{defbox}{Bidirectional RNN}
+A \term{Bidirectional RNN (BiRNN)} runs two separate RNNs over the input:
+\begin{itemize}
+  \item A \textbf{forward} RNN that processes the sequence left-to-right: $\overrightarrow{\mathbf{h}}_t = f(x_1,\ldots,x_t)$.
+  \item A \textbf{backward} RNN that processes the sequence right-to-left: $\overleftarrow{\mathbf{h}}_t = f(x_T,\ldots,x_t)$.
+\end{itemize}
+The final representation at each time step is the \emph{concatenation} (or sum) of the two hidden states:
+\[
+  \mathbf{h}_t = \bigl[\overrightarrow{\mathbf{h}}_t\,;\,\overleftarrow{\mathbf{h}}_t\bigr].
+\]
+\end{defbox}
+
+\begin{notebox}
+Bidirectional processing requires access to the \emph{entire} sequence before computing the representations — it is not applicable to online/streaming prediction tasks where future inputs are unavailable.
+\end{notebox}
+
+\subsubsection{Initialising the Hidden State}
+
+Every RNN requires an initial hidden state $\mathbf{h}_0$ (and $\mathbf{C}_0$ for LSTMs) before processing the first token.
+
+\begin{itemize}
+  \item \textbf{Zero initialisation}: set $\mathbf{h}_0 = \mathbf{0}$. Simple and standard; works well when no prior context is available.
+  \item \textbf{Learned initialisation}: treat $\mathbf{h}_0$ as a trainable parameter and optimise it by backpropagating the prediction error all the way back to $\mathbf{h}_0$. This allows the network to find a starting state that, on average over the training distribution, leads to better performance.
+\end{itemize}
+
+%------------------------------------------------------------
+\subsection{Sequence-to-Sequence Models}
+\label{sec:seq2seq}
+%------------------------------------------------------------
+
+Many practical problems require mapping an input sequence of length $m$ to an output sequence of length $n$, where $m \neq n$ in general. Examples include machine translation (English sentence $\to$ French sentence), speech recognition (audio frames $\to$ text), and image captioning (image $\to$ sentence).
+
+\subsubsection{A Taxonomy of Sequence Tasks}
+
+Following Karpathy's widely cited survey (``The Unreasonable Effectiveness of RNNs''), we can categorise sequence tasks by the relationship between input and output lengths:
+
+\begin{itemize}
+  \item \textbf{One-to-one}: fixed input to fixed output (e.g.\ image classification). No recurrence required.
+  \item \textbf{One-to-many}: fixed input to variable-length output (e.g.\ image captioning: one image $\to$ a sentence of words).
+  \item \textbf{Many-to-one}: variable-length input to fixed output (e.g.\ sentiment analysis: a tweet $\to$ positive/negative label).
+  \item \textbf{Many-to-many (asynchronous)}: variable-length input to variable-length output (e.g.\ machine translation: English sentence $\to$ French sentence, where the two have different lengths).
+  \item \textbf{Many-to-many (synchronised)}: aligned sequences of the same length (e.g.\ video frame classification: label each frame of a video).
+\end{itemize}
+
+\subsubsection{Conditional Language Models}
+
+The formal framing of sequence-to-sequence modelling starts from the \emph{language model}: a model of the joint probability of a sequence $P(y_1, y_2, \ldots, y_n)$. By the chain rule of probability:
+\[
+  P(y_1, y_2, \ldots, y_n) = \prod_{t=1}^{n} p(y_t \mid y_{<t}),
+\]
+where $y_{<t} = (y_1, \ldots, y_{t-1})$ denotes all tokens generated before step $t$.
+
+A \term{conditional language model} extends this to condition on a source input:
+\[
+  P(y_1, \ldots, y_n \mid x_1, \ldots, x_m) = \prod_{t=1}^{n} p(y_t \mid y_{<t},\, x_1, \ldots, x_m).
+\]
+
+The sequence-to-sequence goal is to find the output sequence that maximises this conditional probability:
+\[
+  y^* = \operatorname*{arg\,max}_{y}\; P(y_1, \ldots, y_n \mid x_1, \ldots, x_m).
+\]
+
+\begin{notebox}
+In image captioning, the source $x_1, \ldots, x_m$ is replaced by a single image feature vector $\mathbf{x}$ (e.g.\ the output of a CNN), giving $P(y_1, \ldots, y_n \mid \mathbf{x})$. The structure of the conditional language model is otherwise identical.
+\end{notebox}
+
+\subsubsection{The Encoder--Decoder Framework}
+\label{sec:encoder_decoder}
+
+The standard architecture for sequence-to-sequence learning is the \term{encoder--decoder} (or \emph{seq2seq}) model (Sutskever, Vinyals \& Le, 2014).
+
+\begin{thmbox}{Encoder--Decoder Architecture}
+\begin{enumerate}
+  \item \textbf{Encoder}: an RNN (typically an LSTM) reads the source sequence $\mathbf{x} = (x_1, \ldots, x_m)$ one token at a time. After reading all $m$ tokens, the final hidden state $\mathbf{h}_m^{\text{enc}}$ (and cell state $\mathbf{C}_m^{\text{enc}}$ for LSTMs) is taken as a \term{context vector} $\mathbf{c}$ — a fixed-dimensional summary of the entire source sequence.
+  \item \textbf{Decoder}: a separate RNN (typically another LSTM) is initialised with the context vector $\mathbf{c}$ and generates the target sequence one token at a time. At each step $t$, the decoder takes as input the previously generated token $y_{t-1}$ (or, during training, the ground-truth token via teacher forcing) and produces a probability distribution over the vocabulary $P(y_t \mid y_{<t}, \mathbf{c})$.
+  \item \textbf{Output}: at each decoder step, a softmax layer over the full vocabulary gives the probability of each possible next token.
+\end{enumerate}
+\end{thmbox}
+
+\subsubsection{Training: Teacher Forcing}
+
+During training, a ground-truth input--output pair $\langle \mathbf{x}, \mathbf{y} \rangle$ is available. The decoder does \emph{not} feed its own output back as the next input — instead, the ground-truth target token $y_{t-1}$ is fed at each decoder step. This technique is called \term{teacher forcing} and greatly stabilises training by preventing error accumulation in early stages.
+
+The per-step loss is the cross-entropy between the predicted distribution $\mathbf{p}_t$ and the one-hot ground-truth target $\mathbf{y}_t \in \{0,1\}^{|V|}$:
+\[
+  \ell_t(\mathbf{p}_t, \mathbf{y}_t) = -\sum_{i=1}^{|V|} y_t^i \log p_t^i = -\mathbf{y}_t^\top \log \mathbf{p}_t.
+\]
+The total training loss is summed over the entire output sequence:
+\[
+  \mathcal{L} = -\sum_{t=0}^{n} \mathbf{y}_t^\top \log \mathbf{p}_t.
+\]
+
+During \emph{inference}, teacher forcing is not available (the ground truth is unknown). The decoder instead feeds its own output back as the next input, and a decoding strategy must be chosen.
+
+\subsubsection{Special Tokens}
+
+Practical seq2seq systems rely on a small set of special tokens to manage variable-length sequences in batched training:
+
+\begin{defbox}{Special Tokens in Seq2Seq Training}
+\begin{itemize}
+  \item \textbf{\texttt{<PAD>}}: pads shorter sequences in a batch to the same length, enabling batched matrix operations.
+  \item \textbf{\texttt{<EOS>}} (End-of-Sequence): marks the end of a source or target sequence; signals the decoder to stop generating.
+  \item \textbf{\texttt{<SOS>}/\texttt{<GO>}} (Start-of-Sequence): fed as the first decoder input to trigger generation.
+  \item \textbf{\texttt{<UNK>}} (Unknown): replaces out-of-vocabulary tokens to keep the vocabulary manageable.
+\end{itemize}
+\end{defbox}
+
+A standard batch preparation procedure is:
+\begin{enumerate}
+  \item Sample \texttt{batch\_size} pairs of (source, target) sequences.
+  \item Append \texttt{<EOS>} to each source sequence.
+  \item Prepend \texttt{<SOS>} to the target to form the \emph{decoder input} sequence; append \texttt{<EOS>} to the target to form the \emph{decoder output} (gold) sequence.
+  \item Pad to the maximum length in the batch with \texttt{<PAD>}.
+  \item Map tokens to integer indices via a fixed vocabulary; replace out-of-vocabulary tokens with \texttt{<UNK>}.
+\end{enumerate}
+
+%------------------------------------------------------------
+\subsection{Decoding Strategies}
+\label{sec:decoding}
+%------------------------------------------------------------
+
+After training, inference requires selecting a concrete output sequence from the learned conditional distribution. The goal is:
+\[
+  y' = \operatorname*{arg\,max}_{y} \prod_{t=1}^{n} P(y_t \mid y_{<t},\, x_1, \ldots, x_m,\, \theta).
+\]
+
+Exactly solving this optimisation would require enumerating all possible sequences — exponential in the sequence length. Two practical approximations are standard.
+
+\subsubsection{Greedy Decoding}
+
+\begin{defbox}{Greedy Decoding}
+At each time step, select the single most probable token:
+\[
+  y_t' = \operatorname*{arg\,max}_{y_t}\; P(y_t \mid y_{<t},\, \mathbf{x},\, \theta).
+\]
+This approximation replaces the argmax over all sequences with $n$ separate argmax operations, one per step.
+\end{defbox}
+
+Greedy decoding is fast (linear time in the sequence length) but \textbf{sub-optimal}: the locally best token at step $t$ may lead to a low-probability continuation, and there is no mechanism to backtrack. A token chosen greedily at step 1 cannot be revised in light of future evidence.
+
+\subsubsection{Beam Search}
+
+\term{Beam search} is a best-first search that trades computation for quality by maintaining the $k$ most probable \emph{partial sequences} (hypotheses) at each step, where $k$ is the \term{beam width}.
+
+\begin{algobox}{Beam Search}
+\begin{enumerate}
+  \item Initialise the beam with $k$ copies of the start token.
+  \item At each step, expand each of the $k$ hypotheses by all $|V|$ possible next tokens, yielding $k|V|$ candidate extensions.
+  \item Retain only the $k$ extensions with the highest \emph{cumulative} log-probability:
+  \[
+    \log P(y_1, \ldots, y_t) = \sum_{\tau=1}^{t} \log P(y_\tau \mid y_{<\tau},\, \mathbf{x},\, \theta).
+  \]
+  \item Terminate when all $k$ hypotheses emit \texttt{<EOS>}, or when a maximum length is reached.
+  \item Return the highest-scoring complete hypothesis.
+\end{enumerate}
+\end{algobox}
+
+Beam search with $k = 1$ reduces to greedy decoding. Larger $k$ increases the chance of finding a higher-quality sequence at the cost of $k$ times more computation. Typical values in machine translation are $k \in [4, 10]$.
+
+\begin{insightbox}[Beam Search vs.\ Greedy Decoding]
+Beam search does not guarantee the globally optimal sequence (that would require exhaustive search), but it consistently outperforms greedy decoding by exploring a diverse set of hypotheses and recovering from locally suboptimal choices. The gain is most pronounced in tasks with long outputs and large vocabularies, such as machine translation and summarisation.
+\end{insightbox}
+
+%------------------------------------------------------------
+\subsection{Practical Tips and Best Practices}
+\label{sec:rnn_tips}
+%------------------------------------------------------------
+
+\begin{itemize}
+  \item \textbf{Gradient clipping}: clip the norm of the gradient vector to a threshold (typically 1--5) before applying the parameter update. This prevents the exploding gradient problem without affecting gradient direction, only magnitude.
+  \item \textbf{Truncated BPTT}: instead of unrolling the full sequence (which can be thousands of steps), truncate the backpropagation to $U$ steps. This reduces memory and computation at the cost of ignoring very long-range dependencies.
+  \item \textbf{Dropout for RNNs}: standard dropout applied to the recurrent connections destroys the temporal correlations. Use \emph{variational dropout} (Gal \& Ghahramani, 2016) or \emph{zoneout}, which apply the same dropout mask across all time steps.
+  \item \textbf{Learned initial states}: rather than initialising $\mathbf{h}_0 = \mathbf{0}$, treat $\mathbf{h}_0$ as trainable and optimise it via BPTT. This can improve performance on tasks where the ``average'' input has a non-trivial initial context.
+  \item \textbf{Bidirectionality}: use BiLSTMs whenever the full input sequence is available before prediction is required (e.g.\ sentiment analysis, NER, reading comprehension).
+  \item \textbf{Depth}: stack 2--4 LSTM layers for most tasks. Very deep RNNs may require residual connections between layers (analogous to ResNets) to prevent gradient issues in the depth direction.
+\end{itemize}
+
+%------------------------------------------------------------
+\subsection{Recap: Recurrent Neural Networks}
+\label{sec:recap_rnn}
+%------------------------------------------------------------
+
+\begin{tcolorbox}[colback=WarningRedBg,colframe=WarningRed,boxrule=0.8pt,arc=3pt]
+\textbf{RNN Lecture — Summary (Exam Checklist)}
+\begin{enumerate}
+  \item \textbf{Motivation}: sequential data requires models with memory; static networks (fixed-window autoregressive models, FFNNs) lose long-range context.
+  \item \textbf{Model taxonomy}: memoryless (autoregressive, FFNN) vs.\ memory models (LDS: continuous linear; HMM: discrete stochastic; RNN: continuous nonlinear).
+  \item \textbf{RNN equations}: $\mathbf{h}^t = g_h(\mathbf{W}^{(1)}\mathbf{x}^t + \mathbf{V}^{(1)}\mathbf{c}^{t-1})$; context state $\mathbf{c}^t$ updated similarly; weights \emph{shared across time}.
+  \item \textbf{BPTT}: unroll for $U$ steps; gradients are sums over unrolled copies; average gradient used for shared weight update.
+  \item \textbf{Vanishing gradient}: gradient norm $\leq (\gamma_v \cdot \gamma_{h'})^{t-k}$; with sigmoid/tanh this decays exponentially; long-range dependencies cannot be learnt.
+  \item \textbf{LSTM gates}: forget ($\mathbf{f}_t$), input ($\mathbf{i}_t$), candidate ($\tilde{\mathbf{C}}_t$), output ($\mathbf{o}_t$); cell state update $\mathbf{C}_t = \mathbf{f}_t \odot \mathbf{C}_{t-1} + \mathbf{i}_t \odot \tilde{\mathbf{C}}_t$ is \emph{additive} $\Rightarrow$ gradient highway.
+  \item \textbf{GRU}: simplified LSTM; merges forget and input gates into update gate $\mathbf{z}_t$; no separate cell state; fewer parameters, comparable performance.
+  \item \textbf{Deep \& Bidirectional RNNs}: stacking $L$ LSTM layers gives hierarchical representations; BiLSTM uses both forward and backward passes, concatenates hidden states.
+  \item \textbf{Seq2seq / Encoder--Decoder}: encoder LSTM reads source $\to$ context vector $\mathbf{c}$; decoder LSTM initialised from $\mathbf{c}$, generates target; training uses teacher forcing (feed ground truth $y_{t-1}$, not $\hat{y}_{t-1}$).
+  \item \textbf{Conditional LM}: $P(\mathbf{y}\mid\mathbf{x}) = \prod_t p(y_t\mid y_{<t},\mathbf{x})$; total loss $= -\sum_t \mathbf{y}_t^\top \log \mathbf{p}_t$.
+  \item \textbf{Special tokens}: \texttt{<PAD>} (batching), \texttt{<EOS>} (end signal), \texttt{<SOS>} (decoder start), \texttt{<UNK>} (OOV).
+  \item \textbf{Greedy decoding}: $y_t' = \operatorname*{arg\,max}_{y_t} P(y_t\mid y_{<t},\mathbf{x})$; fast but locally suboptimal; no backtracking.
+  \item \textbf{Beam search}: maintain $k$ best hypotheses; at each step expand all $k$ by $|V|$ tokens, keep top $k$; $k=1$ reduces to greedy; improves output quality at $k\times$ cost.
+\end{enumerate}
+\end{tcolorbox}
+
+%=========================================================
+%  Lecture 14 – Unsupervised Learning: Word Embeddings
+%=========================================================
+\newpage
+\section{Unsupervised Learning: Word Embeddings}
+\label{sec:word_embedding}
+
+%------------------------------------------------------------
+\subsection{Context: Representations Matter}
+\label{sec:we_context}
+%------------------------------------------------------------
+
+Before diving into the technical machinery, it is worth stepping back and appreciating \emph{why} the way we represent words fundamentally limits — or enables — everything a model can learn. The performance of any NLP system, be it a chatbot, a document classifier, or an information retrieval engine, is deeply entangled with how its inputs are encoded.
+
+Recall the three major machine learning paradigms. In \textbf{supervised learning} we are given labelled pairs $\{(x_i, t_i)\}$ and learn a mapping from inputs to outputs. In \textbf{reinforcement learning} an agent learns by interacting with an environment and receiving reward signals. And in \textbf{unsupervised learning} — the focus of this chapter — we exploit the statistical regularities in an unlabelled dataset $\mathcal{D} = \{x_1, x_2, \ldots, x_N\}$ to build a useful internal representation of the data, without any explicit supervision signal. Word embedding is a canonical example of unsupervised representation learning: given only a large corpus of raw text, we learn vector representations of words that capture semantic relationships.
+
+The central question is: what makes a \emph{good} representation of a word?
+
+%------------------------------------------------------------
+\subsection{The Neural Autoencoder: A Prelude}
+\label{sec:autoencoder}
+%------------------------------------------------------------
+
+A useful entry point into unsupervised representation learning is the \term{neural autoencoder}. Understanding its structure motivates why word embeddings take the particular form they do.
+
+\begin{defbox}{Neural Autoencoder}
+An \term{autoencoder} is a network trained to reproduce its own input — that is, to learn the identity function:
+\[
+  \mathbf{x} \;\xrightarrow{\;\text{enc}\;}\; \mathbf{h} \;\xrightarrow{\;\text{dec}\;}\; \hat{\mathbf{x}} \approx \mathbf{x},
+  \qquad \mathbf{x} \in \mathbb{R}^I,\; \mathbf{h} \in \mathbb{R}^J,\; J \ll I.
+\]
+The bottleneck constraint $J \ll I$ forces the network to learn a compressed representation $\mathbf{h}$ that retains the most informative structure in $\mathbf{x}$.
+\end{defbox}
+
+The training objective combines a \textbf{reconstruction loss} with an optional \textbf{sparsity regulariser}:
+\[
+  E(\mathbf{w}) = \bigl\|g_i(\mathbf{x}\,|\,\mathbf{w}) - \mathbf{x}\bigr\|^2
+  \;+\; \lambda \sum_{j} \left| h_j\!\left(\sum_i w_{ji}^{(1)} x_i\right) \right|,
+\]
+where the first term penalises reconstruction error and the second term encourages hidden activations $h_j$ to be close to zero (sparse), so that any active unit carries a meaningful, non-redundant signal. The ideal autoencoder satisfies $\hat{x}_i = g_i(\mathbf{x}\,|\,\mathbf{w}) \approx x_i$ at the output while keeping most $h_j \approx 0$ in the hidden layer.
+
+\subsubsection{Applications of Autoencoders}
+
+Autoencoders have a surprisingly broad range of uses, all stemming from the learned compressed representation $\mathbf{h}$:
+
+\begin{itemize}
+  \item \textbf{Data compression}: the encoder half compresses the input to a compact code; the decoder reconstructs it. Unlike classical codecs, the encoding is learned end-to-end from data.
+  \item \textbf{Nonlinear dimensionality reduction}: a nonlinear generalisation of PCA. While PCA finds a linear projection that maximises variance, an autoencoder with nonlinear activations can discover curved low-dimensional manifolds in high-dimensional data.
+  \item \textbf{Feature extraction and transfer learning}: the representation $\mathbf{h}$ learned on a large unlabelled dataset can be used as input features for a supervised task with limited labelled data (pre-training).
+  \item \textbf{Denoising and anomaly detection}: by training on clean data and then testing with noisy or anomalous inputs, reconstruction error serves as an anomaly score.
+  \item \textbf{Generative modelling}: Variational Autoencoders (VAEs) impose a probabilistic prior on $\mathbf{h}$, enabling the generation of new samples by decoding latent vectors drawn from the prior.
+  \item \textbf{Word embedding}: as we shall see, learning distributed representations of words is structurally equivalent to training a shallow autoencoder — or, more precisely, a predictive model — over a symbolic vocabulary.
+\end{itemize}
+
+%------------------------------------------------------------
+\subsection{The Problem with Discrete Word Representations}
+\label{sec:we_problem}
+%------------------------------------------------------------
+
+Natural language processing has traditionally treated words as \textbf{discrete atomic symbols}. Each word in a vocabulary $V$ is assigned a unique integer identifier, and at the network input level it is represented as a \term{one-hot vector}: a vector of length $|V|$ with a single 1 at the position of the word index and 0s everywhere else.
+
+\begin{itemize}
+  \item \texttt{``cat''} $\;\to\;$ Id\,537 $\;\to\;$ $[\ldots, 0, 1, 0, \ldots]$
+  \item \texttt{``dog''} $\;\to\;$ Id\,143 $\;\to\;$ $[\ldots, 1, 0, 0, \ldots]$
+\end{itemize}
+
+When words from a text document are combined, the standard aggregation is the \term{bag-of-words} (BoW) representation: a vector of length $|V|$ counting how many times each word appears in the document, ignoring word order.
+
+This scheme has two severe shortcomings.
+
+\subsubsection{The Curse of Dimensionality}
+
+Real-world vocabularies have $|V| \sim 10^5$--$10^6$ unique words. Every one-hot vector therefore lives in a space of dimension $10^5$ or more. When input vectors are this sparse and this high-dimensional, the sample complexity of learning grows explosively — this is the \term{curse of dimensionality}. Most pairwise distances between vectors are nearly equal, nearest-neighbour search becomes meaningless, and any statistical model must estimate parameters in a space that is vastly underpopulated by training examples.
+
+\subsubsection{Semantic Blindness}
+
+One-hot vectors are orthogonal by construction:
+\[
+  \langle \mathbf{e}_{\text{cat}},\, \mathbf{e}_{\text{dog}} \rangle = 0, \qquad
+  \langle \mathbf{e}_{\text{obama}},\, \mathbf{e}_{\text{president}} \rangle = 0, \qquad
+  \langle \mathbf{e}_{\text{illinois}},\, \mathbf{e}_{\text{chicago}} \rangle = 0.
+\]
+
+Consider the two sentences:
+\begin{itemize}
+  \item \textit{Obama speaks to the media in Illinois.}
+  \item \textit{The President addresses the press in Chicago.}
+\end{itemize}
+
+These sentences are semantically near-identical, yet under a one-hot BoW representation they share \emph{zero} lexical overlap: every content word maps to a different, orthogonal dimension. Any model relying on this representation cannot generalise from one sentence to the other. We say the representation is \emph{semantically blind}: it cannot capture synonymy, hypernymy, or any other relationship between words.
+
+\begin{insightbox}[Distributional Hypothesis]
+The theoretical foundation of word embeddings is the \term{distributional hypothesis} (Firth, 1957): \emph{``You shall know a word by the company it keeps.''} Words that appear in similar contexts tend to carry similar meanings. This means that the co-occurrence statistics of a word with its surrounding words are a rich, fully unsupervised signal for learning semantic representations — without any need for labelled data.
+\end{insightbox}
+
+%------------------------------------------------------------
+\subsection{Word Embedding: The Idea}
+\label{sec:we_idea}
+%------------------------------------------------------------
+
+\begin{defbox}{Word Embedding}
+A \term{word embedding} is a mapping $C: V \to \mathbb{R}^m$ that assigns to each word $w \in V$ a dense, real-valued vector $\mathbf{c}_w \in \mathbb{R}^m$ such that words with similar meanings are mapped to nearby vectors in $\mathbb{R}^m$.
+
+Typical parameters: $|V| \sim 10^5$--$10^6$ (vocabulary size); $m \in [100, 500]$ (embedding dimension), so $m \ll |V|$.
+\end{defbox}
+
+The mapping $C$ is represented as a matrix $\mathbf{C} \in \mathbb{R}^{|V| \times m}$, where row $i$ is the embedding vector of the $i$-th vocabulary word. Looking up the embedding of word $w$ is therefore just an indexed row access:
+\[
+  C(w) = \mathbf{C}[w, :] \;\in\; \mathbb{R}^m.
+\]
+
+Compared to one-hot representations, embeddings achieve three simultaneous improvements:
+\begin{itemize}
+  \item \textbf{Compression}: dimension reduces from $|V| \sim 10^5$ to $m \sim 300$ — a reduction of several orders of magnitude.
+  \item \textbf{Smoothing}: the discrete vocabulary is mapped to a continuous space, making small perturbations in meaning correspond to small distances in $\mathbb{R}^m$.
+  \item \textbf{Densification}: from sparse one-hot vectors to dense real-valued vectors, making every dimension informative.
+\end{itemize}
+
+Semantically related words cluster together in the embedding space. Words like \textit{cat}, \textit{dog}, \textit{rabbit} form a cluster; words like \textit{Paris}, \textit{London}, \textit{Rome} form another; and the geometric relationships \emph{between} clusters encode higher-order semantic structure, as we shall see in Section~\ref{sec:we_analogies}.
+
+%------------------------------------------------------------
+\subsection{Language Modelling: The Backdrop}
+\label{sec:we_langmodel}
+%------------------------------------------------------------
+
+Most word embedding methods are motivated by, or directly derived from, the task of \term{language modelling}: estimating the probability of a sequence of words.
+
+\begin{defbox}{Language Model}
+A \term{language model} assigns a probability to every sequence of words $s = w_1, w_2, \ldots, w_k$:
+\[
+  P(s) = P(w_1, w_2, \ldots, w_k) = \prod_{i=1}^{k} P(w_i \mid w_1, \ldots, w_{i-1}).
+\]
+The factorisation follows the chain rule of probability and is exact.
+\end{defbox}
+
+Computing $P(w_i \mid w_1, \ldots, w_{i-1})$ exactly requires conditioning on an arbitrarily long history — which is computationally intractable. Two classical approximations exist.
+
+\subsubsection{N-gram Language Models}
+
+The \term{$n$-gram approximation} assumes that the probability of a word depends only on the preceding $n-1$ words (the \emph{Markov assumption} of order $n-1$):
+\[
+  P(w_i \mid w_1, \ldots, w_{i-1}) \;\approx\; P(w_i \mid w_{i-n+1}, \ldots, w_{i-1}).
+\]
+The model can then be estimated from counts:
+\[
+  \hat{P}(w_i \mid w_{i-n+1}, \ldots, w_{i-1}) = \frac{\#(w_{i-n+1}, \ldots, w_{i-1}, w_i)}{\#(w_{i-n+1}, \ldots, w_{i-1})},
+\]
+with smoothing (e.g.\ Katz back-off, Kneser-Ney) applied to handle unseen $n$-grams.
+
+\begin{warnbox}[The Curse of Dimensionality for N-grams]
+Consider a 10-gram language model on a vocabulary of $|V| = 100{,}000$ words. The model must assign a probability to each possible 10-word sequence, which lives in a 10-dimensional space where each axis has $10^5$ values. The total number of parameters grows as $|V|^{n-1} = 10^{45}$ — an astronomical number that no corpus can cover. In practice:
+\begin{itemize}
+  \item Vocabularies reach $|V| \sim 10^6$ unique words.
+  \item Context is limited to $n = 2$ or $n = 3$ (trigram); the famous Katz (1987) smoothed trigram model is a canonical example.
+  \item Even with $n = 3$, most trigrams are unseen in any finite corpus, causing severe sparsity.
+  \item Short contexts mean long-range dependencies are systematically ignored.
+\end{itemize}
+\end{warnbox}
+
+\subsubsection{Continuous Representations: Beyond N-grams}
+
+An alternative family of methods replaces the discrete count-based approach with \emph{continuous} representations of words. These include:
+\begin{itemize}
+  \item \textbf{Latent Semantic Analysis (LSA)}: SVD-based factorisation of word--document co-occurrence matrices.
+  \item \textbf{Latent Dirichlet Allocation (LDA)}: probabilistic topic modelling.
+  \item \textbf{Distributed representations} (neural embeddings): the approach we focus on, pioneered by Bengio et al.\ (2003) and dramatically scaled by Mikolov et al.\ (2013).
+\end{itemize}
+
+%------------------------------------------------------------
+\subsection{The Neural Network Language Model (Bengio et al., 2003)}
+\label{sec:nnlm}
+%------------------------------------------------------------
+
+Bengio, Ducharme, Vincent \& Janvin (2003) proposed the first neural network language model (NNLM) that jointly learned word embeddings and a language model. While their primary goal was to improve language modelling perplexity, the embedding matrix $\mathbf{C}$ they obtained as a by-product turned out to be the real breakthrough.
+
+\subsubsection{Architecture}
+
+The model predicts the next word $w_t$ given a context of $n-1$ preceding words $w_{t-n+1}, \ldots, w_{t-1}$. The training objective is to minimise the negative log-likelihood:
+\[
+  E = -\log \hat{P}(w_t \mid w_{t-n+1}, \ldots, w_{t-1}).
+\]
+
+The network has four distinct layers, illustrated in the diagram below.
+
+\begin{thmbox}{NNLM Architecture (4 Layers)}
+\begin{enumerate}
+  \item \textbf{Input layer} $[(n-1)\cdot|V|]$: the $n-1$ context words are each represented as a one-hot vector of length $|V|$.
+  \item \textbf{Projection layer} $[(n-1)\cdot m]$: each one-hot vector is mapped to its $m$-dimensional embedding via a shared lookup table $\mathbf{C} \in \mathbb{R}^{|V|\times m}$. The $n-1$ embeddings are \emph{concatenated} into a single vector $\mathbf{x} = [C(w_{t-n+1}); \ldots; C(w_{t-1})]$ of dimension $(n-1)\cdot m$.
+  \item \textbf{Hidden layer} $[h,\;\text{tanh}]$: a fully connected layer with $h \in [500, 1000]$ units and tanh activation: $\mathbf{a} = \tanh(\mathbf{d} + \mathbf{H}\mathbf{x})$, where $\mathbf{H} \in \mathbb{R}^{h \times (n-1)m}$ and $\mathbf{d} \in \mathbb{R}^h$ is a bias.
+  \item \textbf{Output layer} $[|V|,\;\text{softmax}]$: a linear layer followed by softmax gives the predicted probability distribution over the full vocabulary:
+  \[
+    \hat{P}(w_i = w_t \mid w_{t-n+1},\ldots,w_{t-1}) = \frac{e^{y_{w_i}}}{\sum_{i'=1}^{|V|}e^{y_{w_{i'}}}},
+    \qquad \mathbf{y} = \mathbf{b} + \mathbf{U}\mathbf{a},
+  \]
+  where $\mathbf{U} \in \mathbb{R}^{|V|\times h}$ are the hidden-to-output weights and $\mathbf{b} \in \mathbb{R}^{|V|}$ is the output bias.
+\end{enumerate}
+The \textbf{total parameter count} per gradient step is dominated by $\mathbf{C}$, $\mathbf{H}$, and $\mathbf{U}$, giving a per-update complexity of:
+\[
+  \mathcal{O}\bigl(n \cdot m + n \cdot m \cdot h + h \cdot |V|\bigr).
+\]
+\end{thmbox}
+
+The crucial observation is that the \textbf{projection matrix $\mathbf{C}$ is shared} across all $n-1$ context positions. Every word in the vocabulary has a single $m$-dimensional embedding that is used regardless of where in the context window the word appears. This weight sharing is what gives the model the ability to generalise: if two words appear in similar contexts, their embedding vectors will be pulled towards similar positions, regardless of whether they appeared in the first, second, or third context slot.
+
+\subsubsection{Results and Limitations}
+
+Bengio et al.\ evaluated on two corpora:
+\begin{itemize}
+  \item \textbf{Brown corpus}: 1.2M words, $|V| \approx 16{,}000$, 200K test set; best model used $h=100$, $n=5$, $m=30$. Training took 3 weeks on 40 CPU cores.
+  \item \textbf{AP News}: 14M words, $|V|$ reduced to 18K; $h=60$, $n=6$, $m=100$.
+\end{itemize}
+
+Relative improvements in test-set perplexity over the best smoothed $n$-gram baseline were 24\% (Brown) and 8\% (AP News) — a meaningful improvement, but at enormous computational cost.
+
+\begin{insightbox}[Bengio's Overlooked Contribution]
+Bengio et al.\ (2003) considered their main contribution to be the improved language model perplexity and mentioned the word vectors only as a by-product for future work. In hindsight, the embedding matrix $\mathbf{C}$ was the most impactful output of the paper. It was left to Mikolov et al.\ (2013) — a decade later — to recognise that one could train \emph{only} for high-quality embeddings, radically simplify the model, and scale to vastly larger corpora.
+\end{insightbox}
+
+The principal limitation of the NNLM is its \textbf{computational cost}: the $h \times |V|$ output layer requires computing $|V|$ inner products at every gradient step. With $|V| \sim 10^6$ this makes the model impractical for large vocabularies. Moreover, the softmax normalisation requires a sum over the entire vocabulary at every step — an $\mathcal{O}(|V|)$ operation that cannot be avoided without approximation.
+
+%------------------------------------------------------------
+\subsection{Word2vec (Mikolov et al., 2013)}
+\label{sec:word2vec}
+%------------------------------------------------------------
+
+Mikolov, Chen, Corrado \& Dean (2013) proposed \term{word2vec}, a family of models designed with a single explicit goal: obtain the best possible word embeddings as efficiently as possible. The strategy is to \emph{simplify} the NNLM so aggressively that the model can be trained on a billion-word corpus in less than a day.
+
+\begin{thmbox}{Word2vec Design Principles}
+\begin{enumerate}
+  \item \textbf{No hidden layer}: eliminating the tanh hidden layer removes the $n \cdot m \cdot h$ cost entirely. The projection directly feeds into the output.
+  \item \textbf{Shared projection layer}: unlike the NNLM, where the projection layer is specific to each context position, word2vec shares a single $m$-dimensional representation for each word regardless of context position.
+  \item \textbf{Symmetric context}: the context window includes words from both the \emph{past} and the \emph{future} of the target word, not just the preceding words.
+  \item \textbf{Hierarchical softmax or negative sampling}: approximate the softmax output to reduce complexity from $\mathcal{O}(h \cdot |V|)$ to $\mathcal{O}(m \cdot \log|V|)$ (hierarchical softmax) or $\mathcal{O}(m \cdot k)$ (negative sampling with $k$ noise samples).
+\end{enumerate}
+\end{thmbox}
+
+Word2vec comes in two architectural flavours, both shown in Figure~\ref{fig:word2vec_flavors}.
+
+\subsubsection{Skip-gram}
+
+The \term{skip-gram} model takes a single word $w_t$ as input and tries to predict the $n/2$ words to its left and the $n/2$ words to its right:
+\[
+  \text{objective:} \quad \max_\theta \sum_{t} \sum_{\substack{-n/2 \leq j \leq n/2 \\ j \neq 0}} \log P(w_{t+j} \mid w_t;\, \theta).
+\]
+
+Architecturally: the input word $w_t$ is looked up in the embedding matrix $\mathbf{C}$ to yield an $m$-dimensional vector. This \emph{single} vector is projected to $n$ output distributions over $|V|$ words (one for each context position). The mapping is \textbf{one-to-many}: from one centre word, predict many surrounding context words.
+
+Skip-gram is particularly good at representing \emph{rare} words: since each training example focuses on predicting the context of one word, even a word that appears rarely in the corpus will have its embedding updated each time it is the centre word.
+
+\subsubsection{Continuous Bag-of-Words (CBOW)}
+
+The \term{CBOW} model inverts the direction: it takes the $n-1$ surrounding context words as input and predicts the single target word $w_t$ at the centre.
+
+\begin{thmbox}{CBOW Architecture}
+For each training pair $(\text{context}, w_t)$ where context $= (w_{t-n/2}, \ldots, w_{t-1}, w_{t+1}, \ldots, w_{t+n/2})$:
+\begin{enumerate}
+  \item \textbf{Input layer} $[|V|]$: a combined one-hot vector of length $|V|$ with 1s at the positions of all $n$ context words.
+  \item \textbf{Projection layer} $[m]$: the shared embedding matrix $\mathbf{C} \in \mathbb{R}^{|V| \times m}$ is applied; the resulting context word vectors are \emph{averaged} (not concatenated as in NNLM):
+  \[
+    \mathbf{p} = \frac{1}{n}\sum_{j \in \text{context}} C(w_j).
+  \]
+  \item \textbf{Output layer} $[|V|,\;\text{hierarchical softmax}]$: the averaged projection $\mathbf{p}$ is multiplied by an output embedding matrix $\mathbf{C}' \in \mathbb{R}^{m \times |V|}$ to produce a score per vocabulary word; hierarchical softmax gives the probability $\hat{P}(w_t \mid \text{context})$.
+\end{enumerate}
+Objective: minimise $E = -\log \hat{P}(w_t \mid \text{context})$.
+\end{thmbox}
+
+\paragraph{Gradient update intuition.} The key quantity is the prediction error at the output. For each $\langle\text{context}, w_t\rangle$ pair:
+\begin{itemize}
+  \item If $\hat{P}(w_i = w_t \mid \text{context})$ is \textbf{overestimated} (the model is too confident about the wrong word), a portion of the output embedding $C'(w_i)$ is \emph{subtracted} from the context word vectors in $\mathbf{C}$, pushing those context embeddings away from $C'(w_i)$.
+  \item If $\hat{P}(w_i = w_t \mid \text{context})$ is \textbf{underestimated}, a portion of $C'(w_i)$ is \emph{added} to the context word vectors, pulling them closer to $C'(w_i)$.
+\end{itemize}
+Note that only the context word vectors (not the target word embedding) are updated during the backward pass for CBOW. After training, the learned input embedding matrix $\mathbf{C}$ is the primary word embedding used downstream; $\mathbf{C}'$ is discarded.
+
+\subsubsection{Complexity and Empirical Performance}
+
+The per-update complexity of word2vec is:
+\[
+  \mathcal{O}(n \cdot m + m \cdot \log|V|),
+\]
+a dramatic reduction from the NNLM's $\mathcal{O}(n \cdot m \cdot h + h \cdot |V|)$.
+
+On the Google News corpus (6 billion words, $|V| \sim 10^6$):
+\begin{itemize}
+  \item \textbf{CBOW} with $m = 1000$: 2 days on 140 CPU cores.
+  \item \textbf{Skip-gram} with $m = 1000$: 2.5 days on 125 CPU cores.
+  \item \textbf{NNLM} (Bengio et al.) with $m = 100$ only: 14 days on 180 CPU cores — and with a smaller embedding!
+\end{itemize}
+
+Training speed reached $10^5$--$5\times 10^6$ words per second. In terms of word analogy accuracy (see Section~\ref{sec:we_analogies}): the best NNLM achieved 12.3\% overall accuracy while word2vec with skip-gram reached \textbf{53.3\%} — more than a four-fold improvement. The ability to train on orders of magnitude more data was the decisive factor.
+
+%------------------------------------------------------------
+\subsection{Geometric Regularities in the Embedding Space}
+\label{sec:we_analogies}
+%------------------------------------------------------------
+
+The most striking property of word2vec embeddings is that \textbf{semantic and syntactic relationships are encoded as linear vector offsets}. This is not merely an aesthetic curiosity — it means that arithmetic on embedding vectors corresponds to reasoning about meaning.
+
+\subsubsection{Constant Difference Vectors}
+
+When the embedding vectors for a set of related word pairs are plotted (e.g.\ using PCA to project to 2D), the difference vector $C(w_{\text{capital}}) - C(w_{\text{country}})$ is approximately \emph{constant} across all country--capital pairs:
+\[
+  C(\text{Beijing}) - C(\text{China}) \;\approx\; C(\text{Paris}) - C(\text{France}) \;\approx\; C(\text{Rome}) - C(\text{Italy}) \;\approx\; \cdots
+\]
+Similarly, the male--female gender difference vector is approximately constant:
+\[
+  C(\text{queen}) - C(\text{king}) \;\approx\; C(\text{woman}) - C(\text{man}) \;\approx\; C(\text{actress}) - C(\text{actor}) \;\approx\; \cdots
+\]
+
+\subsubsection{Analogy Completion by Vector Arithmetic}
+
+These constant-offset properties enable \textbf{analogy completion}: given an analogy of the form ``$a$ is to $b$ as $c$ is to ?\,'', the answer is found by the vector operation:
+\[
+  w^* = \operatorname*{arg\,min}_{w \in V} \;\bigl\| C(w) - \bigl(C(b) - C(a) + C(c)\bigr) \bigr\|,
+\]
+i.e.\ find the word whose embedding is closest to the vector $C(b) - C(a) + C(c)$. Examples:
+
+\begin{center}
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{lll}
+\toprule
+\textbf{Analogy} & \textbf{Vector expression} & \textbf{Result} \\
+\midrule
+king : man $\to$ queen : woman & $C(\text{king}) - C(\text{man}) + C(\text{woman})$ & $\approx C(\text{queen})$ \\
+Paris : France $\to$ Rome : Italy & $C(\text{Paris}) - C(\text{France}) + C(\text{Italy})$ & $\approx C(\text{Rome})$ \\
+Windows : Microsoft $\to$ Android : Google & $C(\text{Windows}) - C(\text{Microsoft}) + C(\text{Google})$ & $\approx C(\text{Android})$ \\
+Einstein : scientist $\to$ Picasso : painter & $C(\text{Einstein}) - C(\text{scientist}) + C(\text{painter})$ & $\approx C(\text{Picasso})$ \\
+his : he $\to$ her : she & $C(\text{his}) - C(\text{he}) + C(\text{she})$ & $\approx C(\text{her})$ \\
+Cu : copper $\to$ Au : gold & $C(\text{Cu}) - C(\text{copper}) + C(\text{gold})$ & $\approx C(\text{Au})$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{insightbox}[Why Do Linear Regularities Emerge?]
+The linear structure arises because word2vec's training objective effectively decomposes the \emph{pointwise mutual information} (PMI) matrix of word co-occurrences. PMI is itself additive in log-space: $\text{PMI}(w, c) = \log P(c \mid w) - \log P(c)$. The embedding dot product $C(w)^\top C'(c)$ approximates PMI, and the constant offset between related pairs reflects the log-ratio of their respective conditional probabilities being approximately constant across the relation. GloVe (Section~\ref{sec:glove}) makes this connection explicit.
+\end{insightbox}
+
+%------------------------------------------------------------
+\subsection{Applications of Word Embeddings}
+\label{sec:we_applications}
+%------------------------------------------------------------
+
+Word embeddings have become the default input representation for essentially all NLP tasks. We illustrate three canonical applications.
+
+\subsubsection{Information Retrieval}
+
+Classical keyword-matching search cannot handle synonymy or paraphrase. Word embeddings provide a principled solution: represent a query and each document as an \emph{aggregated embedding vector} (e.g.\ the sum or average of their word vectors), then retrieve documents ranked by cosine similarity to the query vector.
+
+Example query: \textit{``restaurants in mountain view that are not very good''}. After phrase detection, the query decomposes as: \textit{restaurants} $+$ \textit{in} $+$ \textit{mountain view} $+$ \textit{that are} $+$ \textit{not very good}. Each phrase is embedded and summed to form a query vector, which can retrieve relevant results even if the retrieved documents use different vocabulary (e.g.\ \textit{``dining''} instead of \textit{``restaurants''}, \textit{``poor quality''} instead of \textit{``not very good''}). Note: this simple additive approach works well for short queries but degrades for long documents.
+
+\subsubsection{Document Classification and Similarity}
+
+With bag-of-words, two documents are judged as similar if they share many \emph{identical} words. Under word embeddings, two documents can be judged similar even if they use different but semantically related vocabularies. For instance:
+\begin{itemize}
+  \item $D_0$: \textit{``a cat sat on the mat''}
+  \item $D_1$: \textit{``a cat sat on the mat''} (identical to $D_0$)
+  \item $D_2$: \textit{``a dog lay on the rug''}
+\end{itemize}
+Under BoW, $D_0$ is equally similar to both $D_1$ and $D_2$. Under word embeddings, $D_2$ is correctly identified as semantically similar to $D_0$, since \textit{cat}$\approx$\textit{dog} and \textit{mat}$\approx$\textit{rug} in the embedding space.
+
+\subsubsection{Sentiment Analysis}
+
+Rather than training an explicit classifier, word embeddings enable \emph{geometry-based} sentiment analysis. Words with positive sentiment (\textit{excellent}, \textit{amazing}, \textit{fantastic}) cluster together in the embedding space, as do words with negative sentiment (\textit{terrible}, \textit{awful}, \textit{horrible}). A document's sentiment can be estimated by measuring the cosine distance of its aggregate embedding vector to the centroids of the positive and negative clusters — no labelled sentiment data required.
+
+%------------------------------------------------------------
+\subsection{GloVe: Global Vectors for Word Representation}
+\label{sec:glove}
+%------------------------------------------------------------
+
+\term{GloVe} (Global Vectors for Word Representation), introduced by Pennington, Socher \& Manning (2014), revisits the foundations of word embedding from a count-based perspective and makes explicit a connection that word2vec exploits only implicitly.
+
+\subsubsection{Core Idea: Co-occurrence Ratios Encode Meaning}
+
+GloVe's key insight is that the \emph{ratio} of co-occurrence probabilities, rather than the probabilities themselves, encodes semantic relationships.
+
+Let $X_{ij}$ be the number of times word $j$ appears in the context of word $i$, and let $P(k \mid i) = X_{ik} / \sum_j X_{ij}$ be the probability that word $k$ appears in the context of word $i$.
+
+Consider the words \textit{ice} and \textit{steam}. The table below shows co-occurrence probabilities with selected probe words:
+
+\begin{center}
+\renewcommand{\arraystretch}{1.25}
+\begin{tabular}{lcccc}
+\toprule
+\textbf{Probability / Ratio} & $k=\textit{solid}$ & $k=\textit{gas}$ & $k=\textit{water}$ & $k=\textit{fashion}$ \\
+\midrule
+$P(k\mid\textit{ice})$           & $1.9\times10^{-4}$ & $6.6\times10^{-5}$ & $3.0\times10^{-3}$ & $1.7\times10^{-5}$ \\
+$P(k\mid\textit{steam})$         & $2.2\times10^{-5}$ & $7.8\times10^{-4}$ & $2.2\times10^{-3}$ & $1.8\times10^{-5}$ \\
+$P(k\mid\textit{ice})/P(k\mid\textit{steam})$ & $8.9$ & $8.5\times10^{-2}$ & $\approx 1$ & $\approx 1$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The ratio is large for \textit{solid} (related to ice but not steam), small for \textit{gas} (related to steam but not ice), and close to 1 for \textit{water} (related to both) and \textit{fashion} (related to neither). The \emph{ratio} thus discriminates related from unrelated words far more cleanly than raw probabilities — and GloVe's model is explicitly designed to predict these log-ratios.
+
+\subsubsection{The GloVe Loss Function}
+
+GloVe trains two sets of vectors $\mathbf{w}_i, \tilde{\mathbf{w}}_j \in \mathbb{R}^m$ (centre-word and context-word embeddings) plus scalar biases $b_i, \tilde{b}_j$ by minimising the following \term{weighted least-squares objective}:
+\[
+  J = \sum_{i,j=1}^{V} f(X_{ij})\!\left(\mathbf{w}_i^\top \tilde{\mathbf{w}}_j + b_i + \tilde{b}_j - \log X_{ij}\right)^2,
+\]
+where $f(X_{ij})$ is a weighting function that:
+\begin{itemize}
+  \item Sets $f(0) = 0$ so that zero-count pairs contribute nothing (using the convention $0\log 0 = 0$).
+  \item Grows sub-linearly for large co-occurrence counts, preventing very frequent word pairs from dominating:
+  \[
+    f(x) = \begin{cases} (x/x_{\max})^\alpha & \text{if } x < x_{\max}, \\ 1 & \text{otherwise,} \end{cases}
+  \]
+  with $x_{\max} = 100$ and $\alpha = 3/4$ as typical hyperparameters.
+\end{itemize}
+
+The objective says: the dot product $\mathbf{w}_i^\top\tilde{\mathbf{w}}_j$ should approximate $\log X_{ij}$ (up to the bias terms). Since $\log X_{ij} \approx \text{PMI}(i,j) + \text{const}$, GloVe explicitly regresses on the PMI matrix — making precise what word2vec achieves only implicitly through its training dynamics.
+
+After training, GloVe uses the sum $\mathbf{w}_i + \tilde{\mathbf{w}}_i$ as the final embedding for word $i$, averaging the information captured by the two roles (centre and context) the word plays.
+
+\subsubsection{Geometric Properties of GloVe}
+
+GloVe embeddings exhibit the same linear regularity as word2vec: the constant-difference-vector property holds for morphological transformations (\textit{slow/slower/slowest}, \textit{short/shorter/shortest}), gender relations (\textit{man/woman}, \textit{king/queen}), and analogical reasoning. The 2D PCA projections of GloVe vectors show clearly parallel trajectories for word families related by the same transformation (e.g.\ comparatives and superlatives, or male/female nominal pairs).
+
+\subsubsection{Nearest Neighbours in GloVe Space}
+
+A concrete qualitative evaluation: the nearest neighbours of the word \textit{frog} in a GloVe embedding trained on Wikipedia are:
+\begin{enumerate}
+  \item frog (self), frogs, toad, litoria, leptodactylidae, rana, lizard, eleutherodactylus.
+\end{enumerate}
+These are all amphibians or closely related taxonomic families — the embedding has recovered a biologically meaningful neighbourhood with no explicit biological supervision.
+
+\subsubsection{Word2vec vs.\ GloVe}
+
+\begin{center}
+\renewcommand{\arraystretch}{1.25}
+\begin{tabular}{lll}
+\toprule
+\textbf{Property} & \textbf{Word2vec} & \textbf{GloVe} \\
+\midrule
+Training signal & Local context window & Global co-occurrence matrix \\
+Objective & Predictive (log-likelihood) & Reconstruction (weighted LS) \\
+PMI connection & Implicit & Explicit \\
+Scalability & Online, very fast & Requires full co-occurrence matrix \\
+Rare word handling & Good (skip-gram) & Moderate ($f(0)=0$ helps) \\
+Empirical performance & Similar & Similar \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+In practice, both methods produce embeddings of comparable quality on standard benchmarks. The choice is often made on engineering grounds: word2vec is more straightforward to train incrementally on a stream of data, while GloVe requires computing the full co-occurrence matrix first but then trains very quickly.
+
+%------------------------------------------------------------
+\subsection{Recap: Word Embeddings}
+\label{sec:recap_we}
+%------------------------------------------------------------
+
+\begin{tcolorbox}[colback=WarningRedBg,colframe=WarningRed,boxrule=0.8pt,arc=3pt]
+\textbf{Word Embedding Lecture — Summary (Exam Checklist)}
+\begin{enumerate}
+  \item \textbf{Autoencoder}: network trained to reproduce its input; bottleneck hidden layer $J \ll I$ forces compressed representation; loss $= \|\hat{\mathbf{x}} - \mathbf{x}\|^2 + \lambda\,\text{sparsity}$; applications include compression, dim.\ reduction, anomaly detection, VAEs, and word embedding.
+  \item \textbf{One-hot / BoW problems}: dimension $|V| \sim 10^5$--$10^6$ (curse of dimensionality); all vectors orthogonal (semantic blindness); no generalisation across related words.
+  \item \textbf{Distributional hypothesis (Firth, 1957)}: words that appear in similar contexts have similar meanings — the basis of all embedding methods.
+  \item \textbf{Word embedding}: mapping $C: V \to \mathbb{R}^m$ with $m \ll |V|$; dense, continuous, semantically smooth; similar words cluster together.
+  \item \textbf{N-gram LM}: approximation $P(w_i \mid w_1,\ldots,w_{i-1}) \approx P(w_i \mid w_{i-n+1},\ldots,w_{i-1})$; estimated from counts; intractable for large $n$ and $|V|$; short context misses long-range dependencies.
+  \item \textbf{NNLM (Bengio 2003)}: shared lookup table $\mathbf{C} \in \mathbb{R}^{|V|\times m}$; context embeddings concatenated $\to$ tanh hidden layer $\to$ softmax over $|V|$; complexity $\mathcal{O}(nm + nmh + h|V|)$; embeddings are a by-product; too slow for large data.
+  \item \textbf{Word2vec (Mikolov 2013)}: no hidden layer; shared projection; symmetric context; complexity $\mathcal{O}(nm + m\log|V|)$; two architectures: \textbf{Skip-gram} (centre word $\to$ context words, better for rare words) and \textbf{CBOW} (context words $\to$ centre word, faster for frequent words).
+  \item \textbf{CBOW update}: only context word vectors in $\mathbf{C}$ are updated per training step; overestimated probability $\Rightarrow$ subtract $C'(w_i)$ from context vectors; underestimated $\Rightarrow$ add.
+  \item \textbf{Word2vec vs.\ NNLM}: $\sim\!1000\times$ speed-up; word analogy accuracy 53.3\% (word2vec skip-gram) vs.\ 12.3\% (NNLM).
+  \item \textbf{Geometric regularities}: semantic/syntactic relations as constant difference vectors; analogy $a:b::c:?$ solved by $C(b)-C(a)+C(c)$; examples: king$-$man$+$woman$\approx$queen; Paris$-$France$+$Italy$\approx$Rome.
+  \item \textbf{Applications}: IR (query/doc as summed embeddings, cosine similarity); document similarity (semantics beyond lexical overlap); sentiment analysis (cosine distance to sentiment cluster centroids).
+  \item \textbf{GloVe (Pennington 2014)}: makes PMI structure explicit; loss $J = \sum_{i,j} f(X_{ij})({\mathbf{w}_i^\top\tilde{\mathbf{w}}_j + b_i + \tilde{b}_j - \log X_{ij}})^2$; $f(x)$ down-weights very frequent pairs; final embedding $= \mathbf{w}_i + \tilde{\mathbf{w}}_i$; same linear regularities as word2vec; global co-occurrence vs.\ local window training.
+\end{enumerate}
+\end{tcolorbox}
+
 \end{document}
+
+
