@@ -116,22 +116,28 @@
 
 \usepackage{fancyhdr}
 \pagestyle{fancy}\fancyhf{}
-\fancyhead[L]{\small\color{NoteGray}\textit{Artificial Neural Networks and Deep Learning}}
-\fancyhead[R]{\small\color{NoteGray}\nouppercase{\leftmark}}
+\fancyhead[L]{\small\color{NoteGray}%
+  \begin{minipage}[t]{0.45\textwidth}\raggedright\textit{Artificial Neural Networks and Deep Learning}\end{minipage}}
+\fancyhead[R]{\small\color{NoteGray}%
+  \begin{minipage}[t]{0.45\textwidth}\raggedleft\nouppercase{\leftmark}\end{minipage}}
 \fancyfoot[C]{\small\color{NoteGray}\thepage}
 \renewcommand{\headrulewidth}{0.4pt}
 \renewcommand{\headrule}{\color{RuleColor}\hrule width\headwidth height\headrulewidth}
-\setlength{\headheight}{14pt}
+\setlength{\headheight}{28pt}
 
 \usepackage[colorlinks=true,linkcolor=PrimaryBlue,urlcolor=AccentBlue,
             pdftitle={ANN and Deep Learning}]{hyperref}
+
+\usepackage{imakeidx}
+\makeindex[columns=2, title={Index}, intoc=true]
 
 \setlength{\parindent}{0pt}
 \setlength{\parskip}{0.5em}
 
 \newcommand{\R}{\mathbb{R}}
 \newcommand{\E}{\mathbb{E}}
-\newcommand{\term}[1]{\textcolor{DefGreen}{\textbf{#1}}}
+% \term{} highlights in green AND registers in the index
+\newcommand{\term}[1]{\textcolor{DefGreen}{\textbf{#1}}\index{#1}}
 
 %=========================================================
 \begin{document}
@@ -142,19 +148,37 @@
 {\color{PrimaryBlue}\rule{\linewidth}{2pt}}\\[0.6em]
 {\Huge\bfseries\color{PrimaryBlue} Artificial Neural Networks}\\[0.3em]
 {\Huge\bfseries\color{PrimaryBlue} and Deep Learning}\\[0.4em]
-{\Large\color{SubsectionColor} Notes}\\[0.3em]
-{\color{PrimaryBlue}\rule{\linewidth}{2pt}}\vspace{1.5cm}
-\begin{tcolorbox}[colback=LightBlue,colframe=AccentBlue,width=0.85\textwidth,boxrule=1pt,arc=4pt]
+{\Large\color{SubsectionColor} Complete Study Notes}\\[0.3em]
+{\color{PrimaryBlue}\rule{\linewidth}{2pt}}\vspace{1.2cm}
+\begin{tcolorbox}[colback=LightBlue,colframe=AccentBlue,width=0.88\textwidth,boxrule=1pt,arc=4pt]
 \centering\normalsize\color{NoteGray}
-Machine Learning vs Deep Learning $\cdot$ Biological \& Artificial Neurons\\
-Perceptron $\cdot$ Hebbian Learning $\cdot$ Boolean Operators $\cdot$ XOR Limitation\\
-Feed Forward Neural Networks $\cdot$ Activation Functions $\cdot$ Universal Approximation\\
-Optimization $\cdot$ Gradient Descent $\cdot$ Backpropagation $\cdot$ Chain Rule\\
-Maximum Likelihood Estimation $\cdot$ Loss Functions for Regression \& Classification
+\textbf{Foundations}\\
+Machine Learning vs.\ Deep Learning $\cdot$ Biological \& Artificial Neurons\\
+Perceptron $\cdot$ Hebbian Learning $\cdot$ XOR Limitation\\
+Feed Forward Neural Networks $\cdot$ Activation Functions $\cdot$ Universal Approximation\\[0.5em]
+\textbf{Training \& Optimisation}\\
+Gradient Descent $\cdot$ Backpropagation $\cdot$ Chain Rule\\
+MLE $\cdot$ Loss Functions $\cdot$ Overfitting $\cdot$ Regularisation $\cdot$ Dropout\\
+Momentum $\cdot$ Adam $\cdot$ Batch Normalisation $\cdot$ Weight Initialisation\\[0.5em]
+\textbf{Computer Vision}\\
+Image Classification $\cdot$ Linear Classifiers $\cdot$ Challenges\\
+Convolutional Neural Networks $\cdot$ Pooling $\cdot$ Receptive Fields\\
+LeNet-5 $\cdot$ AlexNet $\cdot$ VGG $\cdot$ GoogLeNet $\cdot$ ResNet $\cdot$ MobileNet $\cdot$ EfficientNet\\
+Data Augmentation $\cdot$ Transfer Learning $\cdot$ CAM $\cdot$ Grad-CAM\\[0.5em]
+\textbf{Dense Prediction \& Detection}\\
+Semantic Segmentation $\cdot$ FCN $\cdot$ U-Net $\cdot$ Transpose Convolution\\
+Localisation $\cdot$ Object Detection $\cdot$ R-CNN $\cdot$ Fast/Faster R-CNN $\cdot$ YOLO\\
+Instance Segmentation $\cdot$ Mask R-CNN $\cdot$ Feature Pyramid Networks\\[0.5em]
+\textbf{Sequential Models}\\
+Recurrent Neural Networks $\cdot$ BPTT $\cdot$ Vanishing Gradients\\
+LSTM $\cdot$ GRU $\cdot$ Seq2Seq $\cdot$ Beam Search\\[0.5em]
+\textbf{Unsupervised Representations}\\
+Autoencoders $\cdot$ Word Embeddings $\cdot$ Word2vec $\cdot$ GloVe
 \end{tcolorbox}
-\vfill{\color{NoteGray}\small For Study Use}
+\vfill{\color{NoteGray}\small Politecnico di Milano --- For Study Use Only}
 \end{titlepage}
 
+\setcounter{tocdepth}{2}   % show sections + subsections only
 \tableofcontents\newpage
 
 %=========================================================
@@ -181,7 +205,31 @@ Given a dataset $D = \{x_1, x_2, \ldots, x_N\}$, there are three main paradigms 
 
 Classical ML follows a two-stage pipeline: first a human expert \emph{hand-crafts features} from raw data (e.g.\ SIFT/HoG for images, MFCC for audio), then a learned classifier or regressor operates on those features. This approach has two fundamental problems. First, if the chosen features do not capture the discriminative structure of the data, even the best classifier cannot succeed — in the worst case the classes are entirely inseparable in feature space. Second, designing good features requires deep domain expertise and is time-consuming.
 
-\term{Deep Learning} replaces hand-crafted features with \emph{learned features}: a hierarchy of representations is learned directly from raw data, optimised end-to-end for the task at hand. Each layer extracts increasingly abstract representations, and because the entire pipeline is trained jointly, the features are guaranteed to be useful for the final objective. Deep Learning is therefore best summarised as \emph{learning data representations from data}.
+\term{Deep Learning} replaces hand-crafted features with \emph{learned features}: a hierarchy of representations is learned directly from raw data, optimised \term{end-to-end} for the task at hand. Each layer extracts increasingly abstract representations, and because the entire pipeline is trained jointly, the features are guaranteed to be useful for the final objective. Deep Learning is therefore best summarised as \emph{learning data representations from data}.
+
+\begin{defbox}{End-to-End Training}
+A system is trained \textbf{end-to-end} when \emph{every} component — from raw input to final output — is
+parameterised by learnable weights, and a \emph{single} loss function drives gradient updates through the
+entire chain simultaneously.
+
+Concretely, consider an image classifier built as:
+\[
+  \underbrace{\text{raw pixels}}_{\text{input}}
+  \;\xrightarrow{\text{feature extractor } f_\theta}\;
+  \underbrace{\mathbf{z}}_{\text{representation}}
+  \;\xrightarrow{\text{classifier } g_\phi}\;
+  \underbrace{\hat{y}}_{\text{prediction}}.
+\]
+In a \textbf{classical ML pipeline}, $f$ is hand-crafted (fixed, not learned) and only $\phi$ is
+optimised.  In an \textbf{end-to-end deep learning pipeline}, \emph{both} $\theta$ and $\phi$ are
+optimised together by back-propagating the task loss $\mathcal{L}(\hat{y}, y)$ all the way from the
+output back to the raw input.
+
+\textbf{Why it matters:} when $f$ is fixed, a suboptimal representation bottlenecks the classifier
+regardless of how well $g$ is trained.  End-to-end training removes this bottleneck: the network
+learns the \emph{best possible} representation for the task at hand, not the best one a human could
+design.
+\end{defbox}
 
 \begin{insightbox}[ML vs Deep Learning: the key distinction]
 In classical ML the \emph{features are fixed} and only the classifier is learned. In Deep Learning \emph{both the features and the classifier are learned jointly}, end-to-end. This is what makes deep models so powerful on raw perceptual data (images, audio, text) where good features are hard to specify by hand.
@@ -648,7 +696,10 @@ The answer is \emph{not} just ``because they work well''. The SSE arises from ML
 \end{warnbox}
 
 %=========================================================
-\section{Big Picture Summary}
+%------------------------------------------------------------
+\subsection{Big Picture Summary}
+\label{sec:bigpicture}
+%------------------------------------------------------------
 %=========================================================
 
 \begin{tcolorbox}[colback=AlgoPurpleBg,colframe=AlgoPurple,boxrule=1pt,arc=4pt,
@@ -682,7 +733,10 @@ Every concept in these notes is an instance of the same idea: \emph{find the par
 
 
 %=========================================================
-\section{Overfitting, Generalization, and Regularization}
+%=========================================================
+\section{Overfitting, Regularisation, and Generalisation}
+\label{sec:regularisation}
+%=========================================================
 %=========================================================
 
 \subsection{Model Complexity and the Bias-Variance Trade-off}
@@ -795,9 +849,9 @@ Cross-validation can be applied at both levels. At the hyperparameter level, one
 Each candidate hyperparameter configuration requires training a full model (possibly $K$ times for K-fold CV). This cost grows quickly with the number of hyperparameters and candidate values. Always be mindful of the computational budget.
 \end{warnbox}
 
-%=========================================================
-\section{Techniques for Preventing Overfitting}
-%=========================================================
+%------------------------------------------------------------
+% Techniques for Preventing Overfitting
+%------------------------------------------------------------
 
 \subsection{What is Regularisation?}
 
@@ -1091,6 +1145,485 @@ In practice, the standard ``out-of-the-box'' recipe is: \textbf{Adam} + \textbf{
 
 
 %=========================================================
+\section{Image Classification: Foundations}
+\label{sec:image_classification}
+%=========================================================
+
+This lecture builds the conceptual and mathematical foundations for image classification.
+It motivates why images are hard to classify, introduces the linear classifier as the simplest
+trainable model, and shows why plain MLPs are insufficient for high-dimensional image data.
+Everything here sets the stage for Convolutional Neural Networks.
+
+%------------------------------------------------------------
+\subsection{Computer Vision and Digital Images}
+\label{sec:cv_digital_images}
+%------------------------------------------------------------
+
+\begin{defbox}{Computer Vision}
+\textbf{Computer Vision} is an interdisciplinary scientific field concerned with enabling computers
+to gain high-level understanding from digital images or videos.  It has grown extraordinarily fast in
+the past decade, largely owing to the marriage of deep learning and large annotated datasets.
+\end{defbox}
+
+Visual recognition encompasses a broad spectrum of tasks, from the simplest to the most complex:
+\begin{itemize}
+  \item \textbf{Image Classification}: assign a single label $y \in \Lambda$ to an image $I$.
+  \item \textbf{Object Detection}: localise and classify all instances of objects in an image (e.g.\ YOLOv3).
+  \item \textbf{Pose Estimation}: predict the spatial configuration of a person's body joints.
+  \item \textbf{Semantic / Instance Segmentation}: assign a class label to every pixel.
+  \item \textbf{Image Captioning}: generate a natural-language description of an image.
+  \item \textbf{Quality Inspection}: detect anomalous patterns in industrial imaging (e.g.\ silicon-wafer defect maps).
+\end{itemize}
+
+\begin{insightbox}[Historical shift in Computer Vision]
+Historically, computer vision relied on mathematical and statistical descriptions of images (hand-crafted
+features such as SIFT, HOG, Gabor filters).  Since around 2012, machine-learning methods — and in particular
+deep neural networks — have become dominant, because they can \emph{learn} the right representation from data
+rather than relying on human intuition.
+\end{insightbox}
+
+%------------------------------------------------------------
+\subsubsection{RGB Images as Tensors}
+%------------------------------------------------------------
+
+A digital \textbf{RGB image} is a three-dimensional array
+\[
+  I \in \mathbb{R}^{R \times C \times 3},
+\]
+where $R$ is the number of rows (height), $C$ is the number of columns (width), and the last
+dimension indexes the three colour channels (Red, Green, Blue).  In Python:
+
+\begin{lstlisting}
+from skimage.io import imread
+I = imread('image.jpg')   # shape: (R, C, 3), dtype uint8
+R_channel = I[:, :, 0]
+G_channel = I[:, :, 1]
+B_channel = I[:, :, 2]
+\end{lstlisting}
+
+Each channel $I[:,:,k] \in \mathbb{R}^{R \times C}$ is a 2-D matrix of intensity values.
+Images are stored with 8 bits per channel per pixel, so values are integers in $[0, 255]$.
+The \textbf{pixel value} at position $(r, c)$ is an RGB triplet, e.g.\ $[253,\,5,\,6]$ for a
+bright red pixel.
+
+\begin{notebox}[Memory vs.\ disk size]
+On disk, images are typically compressed (JPEG, PNG).  When loaded into memory for network
+training, they are decompressed: a single full-HD frame ($1920 \times 1080$, 3 channels) occupies
+approximately $6\,\mathrm{MB}$ uncompressed.  This is an important practical constraint: during
+training, batches of uncompressed images must fit (or be streamed) through GPU memory.
+\end{notebox}
+
+%------------------------------------------------------------
+\subsubsection{Videos as Higher-Dimensional Tensors}
+%------------------------------------------------------------
+
+A colour video of $T$ frames is naturally represented as a 4-D tensor:
+\[
+  V \in \mathbb{R}^{R \times C \times 3 \times T}.
+\]
+A video at full HD and 24 fps consumes approximately $150\,\mathrm{MB/s}$ \emph{before}
+compression.  Visual data are highly redundant (adjacent pixels and frames are strongly correlated),
+which is why codecs (H.264, HEVC) can compress this by orders of magnitude.  Machine-learning
+algorithms for video must account for this dimensionality explosion when designing architectures
+and memory budgets.
+
+%------------------------------------------------------------
+\subsection{Basics of Image Filtering: Spatial Correlation}
+\label{sec:spatial_correlation}
+%------------------------------------------------------------
+
+Before defining how neural networks process images, it is essential to understand the most
+fundamental image processing operation: \textbf{local spatial filtering} (also called correlation).
+This is the operation that convolutional layers are built upon.
+
+\subsubsection{Local (Spatial) Transformations}
+
+A \textbf{local spatial transformation} computes the output at pixel $(r, c)$ as a function of the
+pixel values in a neighbourhood $\mathcal{U}$ centred at $(r, c)$:
+\[
+  G(r, c) = T_{\mathcal{U}}[I](r, c),
+\]
+where $I$ is the input image, $G$ is the output, $\mathcal{U}$ defines the set of displacement
+vectors $(u, v)$ around the centre, and $T_{\mathcal{U}}$ is the transformation function.
+The output at $(r,c)$ depends on all values $I(r+u, c+v)$ for $(u,v) \in \mathcal{U}$.
+
+When the \emph{same} function $T$ is applied at every pixel regardless of position, the
+transformation is called \textbf{space-invariant} (or shift-equivariant).  This is the regime
+of classical image filters and CNN convolutional layers.
+
+\subsubsection{Correlation: The Linear Case}
+
+If $T_{\mathcal{U}}$ is \emph{linear}, the output is a weighted sum of the neighbourhood pixels:
+\[
+  T[I](r, c) = \sum_{(u,v) \in \mathcal{U}} w(u, v)\cdot I(r + u,\, c + v),
+\]
+where the weights $\{w(u,v)\}$ form the \textbf{filter} (or \textbf{kernel}) $\mathbf{w}$.
+For a filter of size $(2L+1) \times (2L+1)$, this operation is called \textbf{correlation}:
+
+\begin{defbox}{Correlation}
+The \textbf{correlation} of image $I$ with filter $\mathbf{w}$ is
+\[
+  (I \otimes \mathbf{w})(r, c)
+  = \sum_{u=-L}^{L} \sum_{v=-L}^{L} w(u, v)\cdot I(r + u,\, c + v).
+\]
+The filter $\mathbf{w}$ is a $(2L+1)\times(2L+1)$ matrix of learnable (or hand-designed) weights.
+The same filter is slid over every position $(r, c)$ of the input — this is the \emph{weight-sharing}
+principle that CNNs exploit.
+\end{defbox}
+
+In Python, the inner loop for a single output pixel looks like:
+\begin{lstlisting}
+acc = 0
+for u in range(-L, L+1):
+    for v in range(-L, L+1):
+        acc += image[r + u, c + v] * w[u, v]
+output[r, c] = acc
+# Wrap this in outer loops over r, c to obtain the full output image
+\end{lstlisting}
+
+\textbf{For RGB (colour) images}, correlation is computed \emph{channel-wise} and then summed:
+\[
+  T[I](r, c)
+  = \sum_{i=1}^{3} \sum_{(u,v) \in \mathcal{U}} w_i(u, v)\cdot I(r + u,\, c + v,\, i).
+\]
+Here the filter $\mathbf{w}$ has three planes (one per colour channel), and the output is a scalar.
+
+\begin{insightbox}[Correlation as Template Matching]
+Correlation of an image $I$ with a filter $\mathbf{w}$ measures how much the image
+\emph{resembles} $\mathbf{w}$ at each location.  The output is high where the image patch
+closely matches the filter and low elsewhere.  This is the basis of the \emph{template-matching}
+interpretation of both classical filters and learned CNN filters.
+
+\textbf{Exam tip:} When both the image and the filter have the same size (e.g.\ $32\times32$ RGB),
+correlation reduces to a single scalar: the inner product $\mathbf{w}^{\top}\mathbf{x}$ (where
+$\mathbf{x}$ is the flattened image).  This is \emph{exactly} the score computed by a linear classifier.
+\end{insightbox}
+
+\begin{warnbox}[Normalisation in template matching]
+If the filter $\mathbf{w}$ is used for template matching (finding where a pattern occurs in an image),
+correlation alone is unreliable: any pixel belonging to a large uniform white region will yield a
+correlation as high as the correct match position (because the region is large, the sum is large).
+\textbf{Normalised cross-correlation} divides by the local image energy, making the score invariant
+to local brightness and contrast.
+\end{warnbox}
+
+%------------------------------------------------------------
+\subsection{The Image Classification Problem}
+\label{sec:image_classification_problem}
+%------------------------------------------------------------
+
+\begin{defbox}{Image Classification}
+Given an image $I \in \mathbb{R}^{R \times C \times 3}$ and a fixed label set
+$\Lambda = \{\lambda_1, \ldots, \lambda_L\}$, \textbf{image classification} is the task of
+assigning a label $y \in \Lambda$ to $I$.
+
+The classifier is a parameterised function
+\[
+  \mathcal{K}_\theta:\; I \;\longmapsto\; \mathcal{K}_\theta(I) \in \Lambda,
+\]
+where $\theta$ denotes the learnable parameters.  In practice, a neural network classifier
+outputs a vector of \emph{confidence scores} (or posterior probabilities) over all $L$ classes:
+\[
+  \mathcal{K}_\theta:\; \mathbb{R}^{R \times C \times 3}
+    \;\longrightarrow\; [0,1]^L,
+\]
+and the predicted class is $\hat{y} = \arg\max_i \mathcal{K}_\theta(I)_i$.
+\end{defbox}
+
+%------------------------------------------------------------
+\subsection{Training a Linear Classifier on Images}
+\label{sec:linear_classifier_images}
+%------------------------------------------------------------
+
+\subsubsection{Feeding Images to a Neural Network: Column-wise Unfolding}
+
+A fully-connected layer expects a 1-D input vector.  The standard approach is to
+\textbf{unfold} (flatten) the image $I \in \mathbb{R}^{R \times C \times 3}$ column-wise into
+a vector $\mathbf{x} \in \mathbb{R}^d$ with $d = R \times C \times 3$:
+\[
+  \mathbf{x} = \mathrm{vec}(I), \qquad d = R \cdot C \cdot 3.
+\]
+For the \textbf{CIFAR-10} dataset (32$\times$32 RGB images, 60{,}000 images in 10 classes),
+$d = 32 \times 32 \times 3 = 3072$.  While this is modest by today's standards, it already
+exceeds the dimensionality of 92\% of UCI Machine Learning Repository datasets.
+
+\subsubsection{The Linear Classifier}
+
+A single-layer network with $L$ output neurons (one per class) and no nonlinearity in the output
+is a \textbf{linear classifier}:
+\[
+  \mathbf{s} = \mathcal{K}(\mathbf{x};\, W, \mathbf{b}) = W\mathbf{x} + \mathbf{b},
+\]
+where
+\begin{itemize}
+  \item $W \in \mathbb{R}^{L \times d}$ is the \textbf{weight matrix},
+  \item $\mathbf{b} \in \mathbb{R}^L$ is the \textbf{bias vector},
+  \item $\mathbf{s} \in \mathbb{R}^L$ is the vector of \textbf{class scores} ($s_i$ = score for class $i$).
+\end{itemize}
+The score for class $i$ is:
+\[
+  s_i = W[i, :] \cdot \mathbf{x} + b_i
+       = \sum_{j=1}^{d} w_{i,j}\, x_j + b_i.
+\]
+The predicted class is $\hat{y} = \arg\max_i s_i$.
+
+In Keras, this corresponds to:
+\begin{lstlisting}
+model = Sequential([
+    Input(shape=(32, 32, 3)),
+    Flatten(),              # 32x32x3 -> 3072
+    Dense(10)               # 3072 -> 10 scores (no activation)
+])
+# Total parameters: 3072 * 10 + 10 = 30,730
+\end{lstlisting}
+
+\begin{notebox}[No softmax needed at prediction time]
+Softmax is a monotone transformation (it preserves ordering of scores).  At \emph{prediction time},
+applying softmax before taking the argmax does not change the predicted class.  It is only needed
+when computing probabilities or the cross-entropy loss during training.
+\end{notebox}
+
+\subsubsection{Why Nonlinearities Are Needed in Deeper Networks}
+
+Stacking multiple linear layers (no activation functions) is equivalent to a \emph{single} linear layer.
+Formally, for three layers:
+\[
+  \mathbf{s} = W_3\bigl(W_2(W_1\mathbf{x} + \mathbf{b}_1) + \mathbf{b}_2\bigr) + \mathbf{b}_3
+             = \widetilde{W}\,\mathbf{x} + \tilde{\mathbf{b}},
+\]
+where $\widetilde{W} = W_3 W_2 W_1$ and $\tilde{\mathbf{b}} = \mathbf{b}_3 + W_3\mathbf{b}_2 + W_3W_2\mathbf{b}_1$.
+No matter how many linear layers we stack, the composition is still a linear map $\mathbb{R}^d \to \mathbb{R}^L$.
+\textbf{Nonlinear activation functions break this collapse}, giving deep networks their representational power.
+
+\begin{warnbox}[Exam-critical point]
+Stacking linear layers without activations is pointless: the result is mathematically equivalent to a single
+linear layer.  Always activate intermediate layers (ReLU, sigmoid, etc.).
+\end{warnbox}
+
+\subsubsection{The Parameters Are Templates}
+
+The rows of $W$ can be reshaped back into images of size $R \times C \times 3$.  Row $W[i, :]$
+is the \textbf{learned template} for class $i$.  The score $s_i = W[i,:]\cdot\mathbf{x} + b_i$ is
+exactly the correlation of the input image with the class template (when both have the same size).
+
+\begin{insightbox}[Template-matching interpretation of the linear classifier]
+Training a linear classifier on images is equivalent to learning one \emph{prototype} (template) per class.
+At test time, each input image is compared (via inner product / correlation) against all $L$ templates,
+and the class with the highest similarity score wins.
+
+\textbf{What do CIFAR-10 templates look like?}  The learned templates are blurry averages of the class
+images: \emph{plane} and \emph{ship} templates are bluish (sky/sea background); \emph{car} and
+\emph{truck} are reddish/grey; \emph{horse} has \emph{two heads} (one facing left, one right) because
+the training set contains horses facing both directions.
+
+\textbf{Key insight for the exam:} The two-headed horse reveals a fundamental limitation of the linear
+classifier — it can learn only \emph{one} template per class.  Any object that can appear in multiple
+orientations or configurations cannot be captured by a single prototype.  This is why deeper architectures
+(with multiple hidden layers) are needed: they can represent multiple modes of a class.
+\end{insightbox}
+
+\begin{insightbox}[Image augmentation follows from this insight]
+If you want a model to be invariant to left-right flips, you must show it flipped examples during training.
+The two-headed horse emerges precisely because the training set contains both orientations — the linear
+classifier has no built-in invariance, so it averages them.  This is the founding principle of
+\textbf{data augmentation}: apply the transformations you want the model to be invariant to, and include
+the augmented examples in the training set.
+\end{insightbox}
+
+\subsubsection{Training the Linear Classifier}
+
+Training finds the parameters $W, \mathbf{b}$ that minimise the total loss over the training set
+$\mathcal{T}_R$:
+\[
+  W^*, \mathbf{b}^*
+  = \arg\min_{W \in \mathbb{R}^{L \times d},\; \mathbf{b} \in \mathbb{R}^L}
+    \sum_{(\mathbf{x}_i, y_i) \in \mathcal{T}_R} \mathcal{L}_{W,\mathbf{b}}(\mathbf{x}_i, y_i)
+    + \lambda\, \mathcal{R}(W, \mathbf{b}),
+\]
+where $\mathcal{L}$ is a loss function (e.g.\ cross-entropy), $\mathcal{R}$ is a regulariser,
+and $\lambda > 0$ balances the two terms.  This is solved by gradient descent (or its stochastic variants).
+
+Once training is complete, the training set can be discarded — only $W$ and $\mathbf{b}$ are needed at
+inference time.
+
+\subsubsection{Geometric Interpretation}
+
+Interpret each flattened image $\mathbf{x} \in \mathbb{R}^d$ as a point in a $d$-dimensional space.
+The score function for class $i$,
+\[
+  f_i(\mathbf{x}) = W[i,:]\cdot\mathbf{x} + b_i,
+\]
+is a \emph{linear function} of $\mathbf{x}$.  The decision boundary between class $i$ and class $j$
+is the set $\{f_i = f_j\}$, which is a \textbf{hyperplane} in $\mathbb{R}^d$.  Thus, the linear
+classifier partitions the input space into $L$ \emph{convex polyhedra} separated by hyperplanes.
+
+\begin{notebox}[Why hidden layers matter geometrically]
+Because linear classifiers partition the input space with \emph{hyperplanes}, they cannot separate
+classes whose decision boundary is non-linear (e.g.\ a ring-shaped class surrounded by another).
+Adding hidden layers with nonlinear activations allows the network to \emph{warp} the input space
+before drawing the final linear boundary, making arbitrarily complex partitions possible.
+\end{notebox}
+
+\subsubsection{Dimensionality and Scalability}
+
+Even with the modest CIFAR-10 images ($d = 3072$), a two-layer MLP with a hidden layer of
+$d/2 = 1536$ neurons already has:
+\[
+  1536 \times 3072 + 1536 = 4{,}720{,}128 \text{ parameters (first layer alone)}.
+\]
+For full-HD images ($d = 1920 \times 1080 \times 3 \approx 6 \times 10^6$), a single hidden layer
+of comparable size would require hundreds of \emph{billions} of parameters.  This motivates the
+need for architectures (CNNs) that exploit the spatial structure of images rather than treating them
+as generic vectors.
+
+%------------------------------------------------------------
+\subsection{The Challenges of Image Classification}
+\label{sec:image_classification_challenges}
+%------------------------------------------------------------
+
+Image classification is deceptively hard.  The five main challenges are:
+
+\subsubsection{1.\ High Dimensionality}
+
+Even the tiny $32 \times 32$ CIFAR-10 images live in $\mathbb{R}^{3072}$, a space far larger than
+most tabular ML datasets (92\% of UCI datasets have fewer than 3{,}200 features).  Full-resolution
+images are several orders of magnitude larger still.  High dimensionality makes distance-based methods
+unreliable and complicates optimisation.
+
+\subsubsection{2.\ Label Ambiguity}
+
+A single image can be truthfully labelled with many different words (``man'', ``beer'', ``dinner'',
+``restaurant'', ``sausages'', \ldots).  The ``correct'' label depends on the intended task and
+the granularity of the label set $\Lambda$.  Collecting consistent annotations is difficult and
+expensive.
+
+\subsubsection{3.\ Transformations that Change the Image but Not Its Label}
+
+The same physical object generates radically different pixel arrays depending on:
+\begin{itemize}
+  \item \textbf{Illumination conditions}: shadows, colour temperature, specular reflections.
+  \item \textbf{Viewpoint}: rotation in 3-D, perspective foreshortening.
+  \item \textbf{Deformation}: a cat sitting vs.\ stretching vs.\ curled up.
+  \item \textbf{Occlusion}: part of the object is hidden.
+  \item \textbf{Background clutter}: irrelevant, visually salient background pixels.
+\end{itemize}
+A good classifier must be \emph{invariant} (or at least \emph{robust}) to all of these.
+
+\subsubsection{4.\ Inter-class Variability}
+
+Images within the same class can be more different from each other (pixel-wise) than images
+from different classes.  For instance, a white cat against a light background and a black cat
+against a dark background are both ``cats'', yet their pixel representations are very similar
+to completely different-class images with matching colour statistics.
+
+\subsubsection{5.\ Perceptual Similarity $\neq$ Pixel Similarity}
+
+\begin{warnbox}[Critical limitation of pixel-wise distances]
+Pixel-wise distances (e.g.\ $\ell_2$: $\|\mathbf{x}_j - \mathbf{x}_i\|_2$) do \emph{not} reflect
+semantic similarity.  Three images can be equidistant (in $\ell_2$) from a reference image
+while being semantically completely different: a brightness shift, a spatial translation, or random
+pixel noise can all produce the same $\ell_2$ distance as a genuine change in scene content.
+
+\textbf{t-SNE visualisations of CIFAR-10} confirm this: when images are embedded by pixel values,
+classes overlap heavily — images from different classes often lie closer together (pixel-wise) than
+images from the same class.  This means any classifier that relies purely on pixel distances will
+fail.
+\end{warnbox}
+
+%------------------------------------------------------------
+\subsection{The $k$-Nearest Neighbour Classifier}
+\label{sec:knn}
+%------------------------------------------------------------
+
+The $k$-NN classifier is the simplest conceivable classifier, and understanding its failure on images
+powerfully motivates more sophisticated architectures.
+
+\subsubsection{Definition}
+
+\begin{defbox}{$k$-Nearest Neighbour ($k$-NN) Classifier}
+Given a training set $\mathcal{T}_R = \{(\mathbf{x}_i, y_i)\}_{i=1}^N$, the $k$-NN classifier
+assigns to a test image $\mathbf{x}_j$ the most frequent label among its $k$ nearest neighbours
+in the training set:
+\[
+  \hat{y}_j = \mathrm{mode}\bigl\{\, y_i : \mathbf{x}_i \in \mathcal{U}_k(\mathbf{x}_j) \bigr\},
+\]
+where $\mathcal{U}_k(\mathbf{x}_j)$ is the set of $k$ training images closest to $\mathbf{x}_j$
+under some distance measure $d(\cdot, \cdot)$.
+
+Common choices for the distance:
+\begin{align*}
+  d_2(\mathbf{x}_j, \mathbf{x}_i) &= \|\mathbf{x}_j - \mathbf{x}_i\|_2
+    = \Bigl(\sum_k (x_j^{(k)} - x_i^{(k)})^2\Bigr)^{1/2} \quad (\ell_2\ \text{distance}),\\
+  d_1(\mathbf{x}_j, \mathbf{x}_i) &= \|\mathbf{x}_j - \mathbf{x}_i\|_1
+    = \sum_k |x_j^{(k)} - x_i^{(k)}| \quad (\ell_1\ \text{/ Manhattan distance}).
+\end{align*}
+For $k = 1$: the test image is assigned the label of its single closest training image.
+\end{defbox}
+
+\textbf{Decision boundary intuition.}  As $k$ increases, the decision boundaries become smoother
+and less sensitive to individual training examples, reducing variance at the cost of increased bias.
+At the extreme $k = N$ the classifier always predicts the majority class.
+
+\subsubsection{Why $k$-NN Fails on Images}
+
+\begin{enumerate}
+  \item \textbf{Computational cost at test time.}  Each prediction requires computing $N$ distances,
+    each of dimension $d$.  For large datasets ($N = 10^6$) and high-dimensional images ($d \sim 10^5$),
+    this is prohibitively slow.
+  \item \textbf{Memory.}  The entire training set must be kept in memory.
+  \item \textbf{Pixel distance $\neq$ semantic distance.}  As discussed above, $\ell_2$ or $\ell_1$
+    distances on pixel vectors fail to capture semantic content.  An image shifted by one pixel is
+    far from the original in $\ell_2$, yet perceptually identical.  Three images equidistant in $\ell_2$
+    from a reference may be semantically completely different (one shifted, one colour-shifted, one with
+    added noise).
+  \item \textbf{Curse of dimensionality.}  In high dimensions, all points tend to become equidistant,
+    making the concept of ``nearest neighbour'' meaningless.
+\end{enumerate}
+
+\begin{insightbox}[The t-SNE CIFAR-10 experiment]
+When CIFAR-10 images are embedded with t-SNE (a 2-D non-linear dimensionality reduction technique
+that preserves local pixel-space distances), the resulting 2-D map shows that classes are heavily
+intermixed.  Images that are semantically identical (two different cats) can be far apart in pixel
+space, while images from different classes (a white cat and a snowy mountain) can be close together.
+
+This definitively shows that \textbf{raw pixel distances are not a useful measure of semantic similarity
+for image classification} — a fundamentally different representation is needed.  This is precisely
+what convolutional neural networks provide.
+\end{insightbox}
+
+%------------------------------------------------------------
+\subsection{Recap: Image Classification Foundations}
+\label{sec:image_classification_recap}
+%------------------------------------------------------------
+
+\begin{tcolorbox}[colback=WarningRedBg,colframe=WarningRed,boxrule=0.8pt,arc=3pt]
+\textbf{Image Classification Foundations — Summary (Exam Checklist)}
+\begin{enumerate}
+  \item \textbf{RGB image}: $I \in \mathbb{R}^{R \times C \times 3}$; 8 bits per channel; loaded as
+    uncompressed array during training.  Video: $V \in \mathbb{R}^{R \times C \times 3 \times T}$.
+  \item \textbf{Correlation}: $(I \otimes \mathbf{w})(r,c) = \sum_{u,v} w(u,v)\,I(r{+}u, c{+}v)$;
+    filter $\mathbf{w}$ slid over all positions; for RGB images, computed channel-wise and summed.
+  \item \textbf{Linear classifier on images}: flatten image to $\mathbf{x} \in \mathbb{R}^d$;
+    $\mathbf{s} = W\mathbf{x} + \mathbf{b}$, $W \in \mathbb{R}^{L \times d}$; predicted class =
+    $\arg\max_i s_i$.  No softmax needed at prediction time.
+  \item \textbf{Template-matching interpretation}: row $W[i,:]$ reshaped to image size is the learned
+    template for class $i$; score $s_i$ is the correlation between input and template.
+  \item \textbf{Two-headed horse}: linear classifier learns one template per class; multiple appearances
+    (e.g.\ horse facing left vs.\ right) get averaged — motivates data augmentation and deeper architectures.
+  \item \textbf{Why nonlinearities}: stacking linear layers collapses to a single linear map
+    $\widetilde{W}\mathbf{x} + \tilde{\mathbf{b}}$ — depth without activations is useless.
+  \item \textbf{Five challenges of image classification}: (1) high dimensionality; (2) label ambiguity;
+    (3) label-preserving transformations (illumination, viewpoint, deformation, occlusion); (4)
+    inter-class variability; (5) perceptual similarity $\neq$ pixel similarity.
+  \item \textbf{$k$-NN classifier}: no training time; $\hat{y}_j = \mathrm{mode}$ of $k$ nearest
+    training images.  Fails on images because pixel distances are semantically meaningless, test-time
+    cost is $O(Nd)$, and the method suffers from the curse of dimensionality.
+  \item \textbf{t-SNE on CIFAR-10}: classes are heavily intermixed in pixel space — raw pixel distances
+    cannot separate semantic classes.  A special architecture (CNN) is needed.
+\end{enumerate}
+\end{tcolorbox}
+
+%=========================================================
 \section{Convolutional Neural Networks (CNNs)}
 \label{sec:cnns}
 %=========================================================
@@ -1334,6 +1867,16 @@ The final dense layer has as many neurons as there are output classes ($L$), fol
 Flattening preserves all spatial information (large vector, many parameters). Global Average Pooling (GAP) compresses each channel to a single scalar, drastically reducing parameters. GAP is preferred in modern architectures (see Section~\ref{sec:nin}).
 \end{notebox}
 
+\begin{warnbox}[Why an MLP specifically — not an SVM or random forest?]
+This is a common exam question. The CNN backbone (conv + pool layers) extracts features; the classifier head maps those features to class scores. In principle, \emph{any} classifier could sit after the flattening step — an SVM, a random forest, a $k$-NN. However, the reason an \textbf{MLP} (dense layers) is used exclusively is \textbf{end-to-end training via backpropagation}.
+
+Backpropagation requires every operation in the pipeline to be \emph{differentiable} with respect to its inputs and parameters, so that gradients can flow from the loss back through the classifier and into the conv layers. An MLP satisfies this: its operations (matrix multiply, bias add, activation) are all differentiable.
+
+An SVM, random forest, or $k$-NN are \textbf{not differentiable} with respect to the feature input in a way that allows gradient-based joint optimisation. If you replace the MLP head with an SVM, the conv layers receive no gradient signal and their weights cannot be updated — you would have to train the backbone and the SVM separately, losing the key advantage of end-to-end learning.
+
+\textbf{Summary:} MLP = differentiable $\Rightarrow$ gradients flow through it $\Rightarrow$ the whole network trains jointly. Any non-differentiable classifier breaks this chain.
+\end{warnbox}
+
 %------------------------------------------------------------
 \subsection{Sparse and Shared Weights: CNNs vs.\ MLPs}
 \label{sec:sparse_shared}
@@ -1450,10 +1993,10 @@ img_retrieved  = X_train_val[sorted_idx[0]]
 label_retrieved = y_train_val[sorted_idx[0]]
 \end{lstlisting}
 
-%=========================================================
-\section{LeNet-5: The First CNN (1998)}
+%------------------------------------------------------------
+\subsection{LeNet-5: The First CNN (1998)}
 \label{sec:lenet}
-%=========================================================
+%------------------------------------------------------------
 
 \term{LeNet-5}, introduced by LeCun et al.\ in 1998, is the first successful deep CNN and a landmark in the history of deep learning. It was designed for handwritten digit recognition (MNIST: 28$\times$28 grayscale images, 10 classes).
 
@@ -1516,14 +2059,14 @@ An MLP taking a $32\times32$ grayscale image directly needs $1024\times84 + \cdo
 The input images are MNIST digits padded to $32\times32$ — the boundary pixels are black (zero). Using \texttt{valid} padding (no zero-padding) at the first conv layer does not lose any meaningful information, and conveniently reduces the spatial dimension, limiting the size of the latent representation downstream.
 \end{warnbox}
 
-%=========================================================
-\section{CNN Anatomy: Parameters, Weights, and Inductive Bias}
+%------------------------------------------------------------
+\subsection{CNN Anatomy: Parameters, Weights, and Inductive Bias}
 \label{sec:cnn_anatomy}
-%=========================================================
+%------------------------------------------------------------
 
-\subsection{Convolution as Matrix Multiplication}
+\subsubsection{Convolution as Matrix Multiplication}
 
-Because convolution is a linear operation, any convolutional layer can be re-expressed as a dense matrix multiplication $\mathbf{a} = W\mathbf{x} + \mathbf{b}$ over flattened input vectors. The weight matrix $W$ for a conv layer has two special structures:
+Because convolution is a linear operation $\mathbf{a} = W\mathbf{x} + \mathbf{b}$ over flattened input vectors. The weight matrix $W$ for a conv layer has two special structures:
 
 \begin{enumerate}
   \item \textbf{Sparsity:} most entries of $W$ are zero. Each output neuron only depends on the neurons in its local receptive field, not all input neurons.
@@ -1532,7 +2075,7 @@ Because convolution is a linear operation, any convolutional layer can be re-exp
 
 Conversely, a fully-connected layer \emph{can} be interpreted as a convolutional layer with a spatial kernel equal to the full input size and no weight sharing (each position uses a different filter). This equivalence is exploited in fully-convolutional networks.
 
-\subsection{Why Sparse + Shared Weights Work}
+\subsubsection{Why Sparse + Shared Weights Work}
 
 \begin{tcolorbox}[colback=LightBlue,colframe=AccentBlue,boxrule=0.8pt,arc=3pt]
 \textbf{Parameter efficiency example (LeNet, first layer):}\\[4pt]
@@ -1548,12 +2091,12 @@ CNN Conv($6, 5\times5$) on $32\times32\times3$ & $6\times5\times5\times3 + 6 = 4
 
 The saving is the key to training CNNs with feasible data and compute. The inductive bias (translation equivariance) is not only a computational trick — it genuinely matches the structure of visual data.
 
-%=========================================================
-\section{Data Scarcity: Data Augmentation and Transfer Learning}
+%------------------------------------------------------------
+\subsection{Data Scarcity: Data Augmentation and Transfer Learning}
 \label{sec:data_scarcity}
-%=========================================================
+%------------------------------------------------------------
 
-\subsection{Why Deep Models Need Large Datasets}
+\subsubsection{Why Deep Models Need Large Datasets}
 
 Deep CNNs (e.g.\ AlexNet with 60M parameters) are only trainable when enough labelled data is available. AlexNet was trained on \textbf{ImageNet}: over 14 million hand-annotated images, 20,000 categories. Two additional enablers: GPU parallelism (NVIDIA GTX 580) and software frameworks (TensorFlow, PyTorch).
 
@@ -1564,7 +2107,7 @@ In many real applications, annotated data is scarce. The two main solutions are:
 \end{itemize}
 
 %------------------------------------------------------------
-\subsection{Data Augmentation}
+\subsubsection{Data Augmentation}
 \label{sec:augmentation}
 %------------------------------------------------------------
 
@@ -1659,7 +2202,7 @@ preprocess = transforms.Compose([
 \end{lstlisting}
 
 %------------------------------------------------------------
-\subsection{Transfer Learning}
+\subsubsection{Transfer Learning}
 \label{sec:transfer_learning}
 %------------------------------------------------------------
 
@@ -1726,7 +2269,7 @@ Every pretrained model was trained with a specific input normalisation (mean, st
 \end{warnbox}
 
 %------------------------------------------------------------
-\subsection{Performance Metrics: Confusion Matrix and ROC}
+\subsubsection{Performance Metrics: Confusion Matrix and ROC}
 %------------------------------------------------------------
 
 \begin{defbox}{Confusion Matrix}
@@ -1747,64 +2290,146 @@ Accuracy depends on the threshold $\Gamma$ and is misleading for imbalanced data
 \label{sec:famous_archs}
 %=========================================================
 
-\subsection{AlexNet (2012): The Deep Learning Revolution}
+The history of deep learning for vision is largely the history of a handful of landmark architectures, each introducing a single powerful idea that unlocked a new level of performance.  Understanding them in chronological order reveals a coherent design narrative: from simple stacks of layers (AlexNet, VGG), to modular multi-scale blocks (GoogLeNet), to the insight that depth itself can be a problem and needs to be engineered around (ResNet), to the modern goal of maximising accuracy per floating-point operation (MobileNet, EfficientNet).
 
-\term{AlexNet} (Krizhevsky, Sutskever, Hinton, NIPS 2012) won the ImageNet Large Scale Visual Recognition Challenge (ILSVRC) 2012 by a dramatic margin ($\sim$10 percentage points), marking the beginning of the deep learning era in computer vision.
+%------------------------------------------------------------
+\subsection{AlexNet (2012): The Deep Learning Revolution}
+\label{sec:alexnet}
+%------------------------------------------------------------
+
+\term{AlexNet} (Krizhevsky, Sutskever, Hinton, NIPS 2012) won the ImageNet Large Scale Visual
+Recognition Challenge (ILSVRC) 2012 with a top-5 error of 15.4\% — roughly 10 percentage points
+better than the second-place entry, which still used hand-crafted features.  This gap shocked the
+computer vision community and triggered an almost immediate switch to deep CNNs across the entire field.
 
 \begin{defbox}{AlexNet Architecture}
-\textbf{Input:} $224\times224\times3$ (RGB).\\
-\textbf{Structure:} 5 convolutional layers (large filters: $11\times11$, $5\times5$) + 3 fully-connected layers.\\
-\textbf{Parameters:} $\sim$60 million. Conv: 3.7M (6\%); FC: 58.6M (94\%).\\
-\textbf{Key innovations:}
-\begin{itemize}
-  \item \textbf{ReLU activations} (faster training, no vanishing gradient for positive activations).
-  \item \textbf{Dropout} (0.5) in FC layers to prevent overfitting.
-  \item \textbf{Max-pooling} instead of average-pooling.
-  \item Trained on 2 GTX 580 GPUs in parallel (5–6 days, 90 epochs).
-  \item Ensemble of 7 models reduced top-5 error: 18.2\% $\to$ 15.4\%.
-\end{itemize}
+\textbf{Input:} $227\times227\times3$ (RGB; the paper states $224\times224$ but the actual forward pass uses $227\times227$).\\[4pt]
+\begin{tabular}{@{}llllr@{}}
+\toprule
+\textbf{Layer} & \textbf{Type} & \textbf{Output size} & \textbf{Details} & \textbf{Params} \\
+\midrule
+Conv1 & Conv $11\times11$, s4 & $55\times55\times96$  & 96 filters, stride 4 & 35K \\
+      & MaxPool $3\times3$, s2 & $27\times27\times96$  & & \\
+Conv2 & Conv $5\times5$, pad2  & $27\times27\times256$ & 256 filters & 614K \\
+      & MaxPool $3\times3$, s2 & $13\times13\times256$ & & \\
+Conv3 & Conv $3\times3$, pad1  & $13\times13\times384$ & 384 filters & 885K \\
+Conv4 & Conv $3\times3$, pad1  & $13\times13\times384$ & 384 filters & 1.33M \\
+Conv5 & Conv $3\times3$, pad1  & $13\times13\times256$ & 256 filters & 885K \\
+      & MaxPool $3\times3$, s2 & $6\times6\times256$   & & \\
+FC6   & Fully Connected        & 4096 & Dropout 0.5 & 37.7M \\
+FC7   & Fully Connected        & 4096 & Dropout 0.5 & 16.8M \\
+FC8   & Fully Connected        & 1000 & Softmax & 4.1M \\
+\midrule
+\multicolumn{4}{l}{\textbf{Total}} & $\approx$60M \\
+\bottomrule
+\end{tabular}\\[6pt]
+Conv layers hold only $\approx$6\% of parameters; the three FC layers hold $\approx$94\%.
 \end{defbox}
 
+\textbf{Key innovations introduced by AlexNet:}
+\begin{itemize}
+  \item \textbf{ReLU activations.}  Using ReLU instead of sigmoid/tanh accelerates training by
+    $\sim$6$\times$ on CIFAR-10 (no vanishing gradient for positive inputs; gradients do not shrink
+    through the nonlinearity).
+  \item \textbf{Dropout (0.5) in FC layers.}  Prevents co-adaptation of neurons; acts as implicit
+    ensemble training.  At test time all neurons are active and outputs are scaled by 0.5.
+  \item \textbf{Overlapping max-pooling.}  Pooling windows of $3\times3$ with stride 2 (instead of
+    non-overlapping stride-equal-to-kernel) give a slight accuracy boost and reduce overfitting.
+  \item \textbf{Local Response Normalisation (LRN).}  After Conv1 and Conv2, activations are
+    normalised across neighbouring channels:
+    \[
+      b^i_{x,y} = a^i_{x,y} \!\Bigl/ \Bigl(k + \alpha\sum_{j=\max(0,i-n/2)}^{\min(N-1,i+n/2)}
+      (a^j_{x,y})^2\Bigr)^\beta
+    \]
+    This implements a form of lateral inhibition inspired by biology.  \textbf{Note:} LRN was
+    largely abandoned in later architectures (VGG showed it provided no clear benefit) and replaced
+    by Batch Normalisation.
+  \item \textbf{Data augmentation.}  Random $224\times224$ crops and horizontal flips from
+    $256\times256$ images; PCA colour jitter.  Reduced top-5 error by over 1\%.
+  \item \textbf{Two-GPU training.}  A single GTX 580 (3 GB VRAM) could not fit the full model.
+    The network was split across two GPUs: each GPU holds half the channels in each conv layer, and
+    the two halves communicate only at specific layers (Conv3 and all FC layers).  This was an
+    engineering necessity, not an architectural choice — modern GPUs make it obsolete.
+  \item \textbf{Ensemble of 7 models:} reduces top-5 error from 18.2\% to 15.4\%.
+\end{itemize}
+
 \begin{insightbox}[AlexNet's historical significance]
-AlexNet's 2012 victory was not just a marginal improvement — it \emph{shocked} the computer vision community, which had not expected a neural network to outperform carefully hand-crafted feature pipelines (e.g.\ HOG+SVM). It triggered a paradigm shift: virtually all competitive vision systems switched to deep CNNs within 2–3 years.
+AlexNet did not invent CNNs (LeNet-5 is from 1998) nor most of its individual components.
+Its contribution was demonstrating — definitively and at scale — that deep CNNs trained on GPUs
+with large datasets outperform hand-crafted feature pipelines by a margin too large to ignore.
+It triggered a paradigm shift: within 2--3 years, virtually all competitive vision systems switched
+to deep CNNs.  The key enabling factors were: ImageNet (large labelled dataset), ReLU (stable deep
+training), and GPUs (10$\times$--50$\times$ speedup over CPUs for matrix operations).
 \end{insightbox}
 
 %------------------------------------------------------------
-\subsection{VGG16 (2014): Going Deeper with Small Filters}
+\subsection{VGG (2014): Going Deeper with Small Filters}
 \label{sec:vgg}
 %------------------------------------------------------------
 
-\term{VGG16} (Simonyan \& Zisserman, ICLR 2015) won 1st place (localisation) and 2nd place (classification) in ILSVRC 2014. Its key insight: \emph{replace large filters with stacks of small $3\times3$ filters}.
+AlexNet showed that depth matters, but used large filters ($11\times11$, $5\times5$) in early layers.
+\term{VGGNet} (Simonyan \& Zisserman, ICLR 2015) asked: \emph{what if we use \emph{only} $3\times3$
+filters, everywhere, and just go deeper?}  The answer turned out to be: better accuracy with a
+cleaner, more principled design.  VGG16 (16 weight layers) and VGG19 (19 weight layers) won 1st
+place (localisation) and 2nd place (classification) at ILSVRC 2014.
 
 \begin{defbox}{VGG16 Architecture}
 \textbf{Input:} $224\times224\times3$.\\
-\textbf{Structure:} 13 convolutional layers (all $3\times3$, stride 1) grouped in blocks, each block followed by $2\times2$ max-pooling. Ends with 3 FC layers (4096, 4096, 1000).\\
-\textbf{Parameters:} $\sim$138 million. Conv: 11\% ($\approx$15M); FC: 89\% ($\approx$123M, mostly \texttt{fc1}: 102M).\\
-\textbf{Memory:} $\sim$100 MB per image for forward activations; $\sim$200 MB during training (backward pass).
+\textbf{Structure:} 13 convolutional layers (all $3\times3$, stride 1, padding 1) grouped in 5
+blocks, each block followed by $2\times2$ max-pooling (stride 2).  Three final FC layers (4096,
+4096, 1000 neurons).\\[4pt]
+\begin{tabular}{@{}llr@{}}
+\toprule
+\textbf{Block} & \textbf{Layers} & \textbf{Output size} \\
+\midrule
+Block 1 & 2$\times$ Conv $3\times3$ (64 filters) + MaxPool & $112\times112\times64$ \\
+Block 2 & 2$\times$ Conv $3\times3$ (128) + MaxPool & $56\times56\times128$ \\
+Block 3 & 3$\times$ Conv $3\times3$ (256) + MaxPool & $28\times28\times256$ \\
+Block 4 & 3$\times$ Conv $3\times3$ (512) + MaxPool & $14\times14\times512$ \\
+Block 5 & 3$\times$ Conv $3\times3$ (512) + MaxPool & $7\times7\times512$ \\
+FC6     & Dense 4096 (+ Dropout 0.5)                & 4096 \\
+FC7     & Dense 4096 (+ Dropout 0.5)                & 4096 \\
+FC8     & Dense 1000 + Softmax                      & 1000 \\
+\bottomrule
+\end{tabular}\\[6pt]
+\textbf{Parameters:} $\sim$138M total.  Conv layers: $\approx$15M (11\%); FC layers: $\approx$123M
+(89\%), of which FC6 alone contributes $7\times7\times512\times4096 \approx 102\text{M}$ — the
+single most expensive layer.\\
+\textbf{Memory:} $\sim$100 MB per image for forward activations; $\sim$200 MB during training.
 \end{defbox}
 
 \subsubsection{Why Small Filters?}
 
 \begin{tcolorbox}[colback=LightBlue,colframe=AccentBlue,boxrule=0.8pt,arc=3pt]
-\textbf{Three $3\times3$ convolutions vs.\ one $7\times7$ convolution:}\\[4pt]
+\textbf{Three $3\times3$ convolutions vs.\ one $7\times7$ convolution} (single input channel, $C$ output channels):
+\medskip\\
 \begin{tabular}{@{}lcc@{}}
 \toprule
-\textbf{Property} & \textbf{$3\times$ Conv($3\times3$)} & \textbf{$1\times$ Conv($7\times7$)} \\
+\textbf{Property} & \textbf{$3\times$ Conv($3\times3$, $C$ ch.)} & \textbf{$1\times$ Conv($7\times7$, $C$ ch.)} \\
 \midrule
-Receptive field & $7\times7$ & $7\times7$ \\
-Filter parameters (single channel) & $3\times3\times3 = 27$ & $7\times7 = 49$ \\
+Receptive field on input & $7\times7$ & $7\times7$ \\
+Parameters (no bias) & $3 \times (3^2 \cdot C^2) = 27C^2$ & $7^2 \cdot C^2 = 49C^2$ \\
 Nonlinearities applied & 3 & 1 \\
 \bottomrule
 \end{tabular}\\[6pt]
-\textit{Same receptive field, fewer parameters, more nonlinearities.}
+\textit{Same receptive field.  45\% fewer parameters.  3$\times$ more nonlinearities.}
 \end{tcolorbox}
 
 \begin{insightbox}[The deep-and-narrow principle]
-VGG demonstrates that depth is more effective than large filter size. Multiple stacked small filters achieve the same receptive field as a single large filter while requiring fewer parameters and introducing more nonlinearity. This principle guides most modern architecture design.
+VGG demonstrates that \emph{depth is more efficient than large filter size}.  Multiple stacked small
+filters achieve the same receptive field as a single large filter while requiring fewer parameters
+and introducing more nonlinearity per parameter.  This principle guides virtually all modern
+architecture design: from GoogLeNet's $3\times3$ and $5\times5$ branches, to ResNet's $3\times3$
+bottleneck blocks, to MobileNet's depthwise $3\times3$ filters.
 \end{insightbox}
 
 \begin{warnbox}[VGG limitations]
-VGG's 138M parameters are mostly in the 3 FC layers. This makes it very memory-hungry and inference-expensive. Despite its conceptual elegance, it is largely superseded by more parameter-efficient architectures (ResNet, EfficientNet) in practice.
+VGG's 138M parameters are almost entirely in the three FC layers — not in the conv layers that
+do the actual feature extraction.  This makes it very memory-hungry and slow at inference.
+In practice, VGG is superseded by ResNet and EfficientNet, which achieve better accuracy with a
+fraction of the parameters.  The main reason VGG is still taught and used is its conceptual
+simplicity: uniform $3\times3$ convolutions throughout, making it easy to reason about receptive
+fields and layer outputs.
 \end{warnbox}
 
 %------------------------------------------------------------
@@ -1909,148 +2534,218 @@ An MLP after flattening connects \emph{specific spatial positions} to output neu
 \label{sec:inception}
 %------------------------------------------------------------
 
-\term{GoogLeNet} (Szegedy et al., CVPR 2015) won ILSVRC 2014 classification with only 5M parameters — 12$\times$ fewer than AlexNet — while being deeper (22 layers of inception modules).
+VGG achieved better accuracy than AlexNet but at the cost of \emph{more} parameters (138M vs.\ 60M).
+\term{GoogLeNet} (Szegedy et al., CVPR 2015) attacked the opposite question: \emph{can we achieve
+better accuracy with dramatically \emph{fewer} parameters?}  The answer was yes — 5M parameters,
+$12\times$ fewer than AlexNet — by rethinking how to combine spatial and channel information.
 
 \subsubsection{Motivation: Features at Multiple Scales}
 
-Objects in natural images appear at widely varying scales. A fixed filter size (say $3\times3$) may be too small for a large object or too large for fine-grained details. The solution: run multiple filter sizes \emph{in parallel} and let the network decide which to attend to.
+Objects in natural images appear at widely varying scales: a dog may fill the frame, or be a small
+patch in the background.  A fixed filter size (say $3\times3$) may be too small for large objects
+or too large for fine-grained details.  The \emph{naive} solution — use a larger filter — quickly
+becomes computationally prohibitive on deep feature maps with hundreds of channels.  GoogLeNet's
+solution: run multiple filter sizes \emph{in parallel} and let the network learn which scale is
+most informative at each layer.
 
 \subsubsection{Inception Module}
 
 \begin{defbox}{Inception Module (v1)}
-At each Inception block, four parallel branches operate on the same input volume:
+At each Inception block, four parallel branches operate on the \emph{same} input volume and their
+outputs are \textbf{concatenated along the channel axis}:
 \begin{enumerate}
-  \item $1\times1$ conv (captures fine-grained, local patterns)
-  \item $1\times1$ bottleneck $\to$ $3\times3$ conv (medium-scale features)
-  \item $1\times1$ bottleneck $\to$ $5\times5$ conv (large-scale features)
-  \item $3\times3$ max-pool $\to$ $1\times1$ conv (pooled features)
+  \item \textbf{$1\times1$ conv} — captures fine-grained, point-wise cross-channel patterns.
+  \item \textbf{$1\times1$ bottleneck $\to$ $3\times3$ conv} — medium-scale spatial features at
+    reduced channel cost.
+  \item \textbf{$1\times1$ bottleneck $\to$ $5\times5$ conv} — large-scale spatial features at
+    reduced channel cost.
+  \item \textbf{$3\times3$ max-pool $\to$ $1\times1$ conv} — pooled spatial summary with channel
+    compression.
 \end{enumerate}
-All branches use zero-padding to preserve the spatial size. Outputs are \textbf{concatenated along the channel dimension}: $\mathrm{output} = \mathrm{concat}([b_1, b_2, b_3, b_4], \text{axis}=\mathrm{channel})$.
+All branches use \texttt{padding='same'} to preserve spatial dimensions.  Outputs of all four
+branches are concatenated: $\text{output} = \mathrm{concat}([b_1, b_2, b_3, b_4],\;\text{axis=channel})$.
+
+\textbf{What the inception module changes and what it does not:}
+\begin{itemize}
+  \item \textbf{Spatial size $H \times W$}: \textbf{unchanged}. Every branch uses \texttt{padding='same'} and stride 1, so all four branch outputs have the same $H \times W$ as the input. This is a requirement for concatenation. The module does \emph{not} reduce spatial dimensions.
+  \item \textbf{Channel depth}: \textbf{grows}. The output has more channels than the input (sum of all branch output channels), giving a richer representation.
+  \item \textbf{Receptive field}: grows normally through subsequent layers as in any conv stack. The inception module does \emph{not} use skip connections and does \emph{not} have any special receptive field mechanism.
+\end{itemize}
 \end{defbox}
 
-The $1\times1$ bottlenecks are essential: without them, computing $5\times5$ convs on a 480-channel input costs 854M operations; with them, the cost drops to 358M.
+\textbf{Why the $1\times1$ bottlenecks are indispensable.}  On a feature map with 480 channels,
+a $5\times5$ conv with 128 output channels costs
+$5^2 \times 480 \times 128 \approx 154\text{M}$ operations.
+Inserting a $1\times1$ conv that first reduces from 480 to 16 channels cuts this to
+$(1^2 \times 480 \times 16) + (5^2 \times 16 \times 128) \approx 58\text{M}$ operations — a $\sim$\textbf{2.7$\times$ reduction} at that branch alone.
+Across the whole module the saving is even larger: from 854M to 358M total operations.
 
-\begin{lstlisting}[caption={Simplified Inception module in Keras}]
-# Input tensor x of shape (H, W, C)
-x1 = tf.keras.layers.Conv2D(32, kernel_size=1, padding='same',
-                             activation='relu', name='conv_1x1')(x)
-x2 = tf.keras.layers.Conv2D(64, kernel_size=1, padding='same',
-                             activation='relu', name='bottleneck_3x3')(x)
-x2 = tf.keras.layers.Conv2D(128, kernel_size=3, padding='same',
-                             activation='relu', name='conv_3x3')(x2)
-x3 = tf.keras.layers.Conv2D(16, kernel_size=1, padding='same',
-                             activation='relu', name='bottleneck_5x5')(x)
-x3 = tf.keras.layers.Conv2D(32, kernel_size=5, padding='same',
-                             activation='relu', name='conv_5x5')(x3)
-x4 = tf.keras.layers.MaxPooling2D((3,3), strides=(1,1),
-                                   padding='same', name='mp_branch')(x)
-x4 = tf.keras.layers.Conv2D(32, kernel_size=1, padding='same',
-                             activation='relu', name='conv_after_pool')(x4)
-# Concatenate all branches along the channel axis
-y = tf.keras.layers.Concatenate(axis=-1, name='concat')([x1, x2, x3, x4])
+\begin{insightbox}[Exam trap: operations vs.\ parameters, and the ``naive'' vs.\ ``bottleneck'' variant]
+The $1\times1$ bottleneck reduces \emph{both} operations and parameters, but through the same mechanism — reducing $C_\text{in}$ before the expensive conv:
+
+\textbf{Operations} (FLOPs): a $5\times5$ conv costs $5^2 \cdot C_\text{in} \cdot N_F \cdot H \cdot W$ multiply-adds per layer. Reducing $C_\text{in}$ from 480 to 16 cuts this by 30$\times$ for that conv.
+
+\textbf{Parameters}: a $5\times5$ conv has $5^2 \cdot C_\text{in} \cdot N_F$ weights. Same reduction: from $5^2 \times 480 \times 128 = 1{,}536{,}000$ to $5^2 \times 16 \times 128 = 51{,}200$ filter weights (plus the $1\times1$ conv itself: $480 \times 16 = 7{,}680$).
+
+\textbf{Historical note — the ``variant'':} the original conceptual inception module (as first sketched) ran $1\times1$, $3\times3$, and $5\times5$ convolutions \emph{directly on the full-channel input}, without any bottleneck. The $1\times1$ bottleneck convolutions were introduced as a \textbf{practical modification} to make the module computationally tractable. Exam questions sometimes frame this as ``in a variant of the inception block, $1\times1$ convolutions were introduced to reduce parameters'' — this is technically correct and refers to this historical refinement from the naive to the bottleneck version.
+\end{insightbox}
+
+\begin{lstlisting}[caption={Inception module in Keras (full 4-branch version)}]
+# x: input tensor of shape (N, H, W, C)
+# Branch 1: 1x1 conv
+b1 = tf.keras.layers.Conv2D(32,  kernel_size=1, padding='same', activation='relu')(x)
+
+# Branch 2: 1x1 bottleneck -> 3x3 conv
+b2 = tf.keras.layers.Conv2D(64,  kernel_size=1, padding='same', activation='relu')(x)
+b2 = tf.keras.layers.Conv2D(128, kernel_size=3, padding='same', activation='relu')(b2)
+
+# Branch 3: 1x1 bottleneck -> 5x5 conv
+b3 = tf.keras.layers.Conv2D(16,  kernel_size=1, padding='same', activation='relu')(x)
+b3 = tf.keras.layers.Conv2D(32,  kernel_size=5, padding='same', activation='relu')(b3)
+
+# Branch 4: 3x3 max-pool -> 1x1 conv
+b4 = tf.keras.layers.MaxPooling2D((3,3), strides=(1,1), padding='same')(x)
+b4 = tf.keras.layers.Conv2D(32,  kernel_size=1, padding='same', activation='relu')(b4)
+
+# Concatenate along channel axis (axis=-1 in Keras's NHWC convention)
+y = tf.keras.layers.Concatenate(axis=-1)([b1, b2, b3, b4])
 \end{lstlisting}
+
+\begin{warnbox}[PyTorch convention for concatenation]
+In PyTorch, tensors are \texttt{(N,C,H,W)}, so channel concatenation is \texttt{torch.cat([b1,b2,b3,b4], dim=1)}.
+In Keras, tensors are \texttt{(N,H,W,C)}, so it is \texttt{Concatenate(axis=-1)}.
+Also note: because the Inception module has parallel branches that \emph{merge}, it cannot be
+expressed with \texttt{nn.Sequential} in PyTorch — you must write the branches explicitly in
+\texttt{forward()}.
+\end{warnbox}
 
 \begin{insightbox}[3 take-home messages from GoogLeNet]
 \begin{enumerate}
-  \item \textbf{Parallel branches:} process the same input at multiple scales simultaneously and merge by concatenation.
-  \item \textbf{$1\times1$ convolutions as bottlenecks:} reduce channel depth before expensive spatial convolutions to dramatically cut computation and parameters.
-  \item \textbf{Auxiliary losses:} intermediate classification heads attached to intermediate layers are trained jointly. This injects gradient signal into early layers, combating vanishing gradients. These auxiliary heads are discarded at inference.
+  \item \textbf{Parallel branches at multiple scales:} process the same input with $1\times1$,
+    $3\times3$, and $5\times5$ filters simultaneously; concatenate results.  This lets the
+    network adaptively weight which scale is most informative.
+  \item \textbf{$1\times1$ convolutions as cheap bottlenecks:} reduce channel depth before
+    expensive spatial convolutions, cutting operations by 2--8$\times$ per branch.
+  \item \textbf{Auxiliary classification losses:} inject gradient signal into early layers to
+    fight vanishing gradients (see below).
 \end{enumerate}
 \end{insightbox}
 
 \subsubsection{GoogLeNet Architecture Details}
 
-GoogLeNet stacks \textbf{27 layers} total (including pooling layers), structured as:
+GoogLeNet stacks \textbf{27 layers} total (including pooling), structured as:
 \begin{enumerate}
-  \item Two initial blocks of conv + pooling layers (traditional processing).
+  \item Two initial blocks of conv + pooling (traditional processing to reduce spatial resolution
+    before the expensive inception modules begin).
   \item \textbf{Nine Inception modules} stacked sequentially.
-  \item No fully-connected layers: a GAP layer feeds directly into a linear classifier + softmax.
+  \item \textbf{No fully-connected layers}: a GAP layer feeds directly into a linear classifier
+    + softmax.  This alone saves $\sim$50M parameters compared to VGG's FC layers.
 \end{enumerate}
-Total trainable parameters: \textbf{only 5M} — 12$\times$ fewer than AlexNet (60M) despite being deeper.
+Total trainable parameters: \textbf{only 5M} — 12$\times$ fewer than AlexNet (60M) despite being
+deeper and more accurate.
 
-\textbf{Auxiliary classifiers.} GoogLeNet also suffers from vanishing gradients at training time. To address this, two \textbf{auxiliary classification heads} are attached to intermediate feature representations. These produce additional losses used only during training (weighted at 0.3 each); they are removed at inference. The motivation: you expect intermediate representations to already carry meaningful classification information.
-
-\begin{lstlisting}[language=Python, caption={Inception module in PyTorch (simplified)}]
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-
-# x: input tensor of shape (N, C_in, H, W)
-x = nn.MaxPool2d(kernel_size=2, stride=2, padding=1)(x)
-
-# Branch 1: 1x1 conv
-x1 = nn.Conv2d(C_in, 32, kernel_size=1, padding=0)(x)
-x1 = F.relu(x1)
-
-# Branch 2: 1x1 conv
-x2 = nn.Conv2d(C_in, 64, kernel_size=1, padding=0)(x)
-x2 = F.relu(x2)
-
-# Branch 3: max-pool, spatial dim preserved (stride=1, padding=1)
-x3 = nn.MaxPool2d(kernel_size=3, stride=1, padding=1)(x)
-
-# Concatenate branches along the channel dimension (dim=1 in PyTorch)
-y = torch.cat([x1, x2, x3], dim=1)
-\end{lstlisting}
-
-\begin{warnbox}[PyTorch Inception implementation pitfalls]
-\begin{itemize}
-  \item All branches must produce tensors of the \textbf{same spatial size} before concatenation. Use \texttt{padding=1} and \texttt{stride=1} in max-pool branches.
-  \item Concatenation is along \texttt{dim=1} (channel axis) in PyTorch's $(N,C,H,W)$ convention — this is \texttt{axis=-1} in Keras's $(N,H,W,C)$ convention.
-  \item CNNs with inception modules are no longer sequential: they require parallel processing and explicit concatenation — use PyTorch's functional API rather than \texttt{nn.Sequential}.
-\end{itemize}
-\end{warnbox}
+\textbf{Auxiliary classifiers.}  GoogLeNet also faces vanishing gradients: at 22 layers deep,
+gradient signals from the final loss are attenuated before reaching early layers.  The solution:
+attach two \textbf{auxiliary classification heads} to intermediate feature maps (after the 3rd
+and 6th Inception modules).  Each auxiliary head consists of an average-pool layer, a $1\times1$
+conv, two FC layers, and a softmax classifier.  Their losses are added to the main loss, weighted
+at 0.3 each:
+\[
+  \mathcal{L}_{\text{total}} = \mathcal{L}_{\text{main}} + 0.3\,\mathcal{L}_{\text{aux1}}
+                                                          + 0.3\,\mathcal{L}_{\text{aux2}}.
+\]
+The auxiliary heads are \emph{only active during training} and discarded at inference.  The
+motivation: intermediate representations should already contain meaningful class information —
+asking them to classify forces the network to maintain useful features throughout, not just at
+the very end.
 
 %------------------------------------------------------------
 \subsection{ResNet (2015): Residual Learning}
 \label{sec:resnet}
 %------------------------------------------------------------
 
-\term{ResNet} (He et al., CVPR 2016) introduced \term{residual connections} (skip connections), enabling networks of 152+ layers. It won ILSVRC 2015 with 3.57\% top-5 error — surpassing human-level performance on ImageNet.
+GoogLeNet showed that clever architecture design (parallel branches, $1\times1$ bottlenecks) could
+achieve more with fewer parameters.  But both AlexNet, VGG, and GoogLeNet faced a common ceiling:
+making networks \emph{much} deeper consistently hurt performance.  \term{ResNet} (He et al., CVPR
+2016) asked why, diagnosed the cause as an \emph{optimisation} problem rather than an
+\emph{expressiveness} problem, and introduced a fix so simple it seems obvious in hindsight:
+add a direct path from input to output around every block of layers.
 
 \subsubsection{The Degradation Problem}
 
-Empirically, adding more layers to a network \emph{beyond a certain depth} increases \emph{both} training and test error — this cannot be explained by overfitting (which would decrease training error while increasing test error). It indicates an \textbf{optimisation problem}: deeper networks are harder to train, not less expressive.
+Empirically, adding more layers to a plain (no skip connections) network beyond a certain depth
+\emph{increases both training and test error}.  This is \textbf{not} overfitting — overfitting
+would decrease training error while increasing test error.  It is an \textbf{optimisation failure}:
+deeper networks are simply harder to train.
 
 \begin{insightbox}[Why deeper should not be worse]
-Theoretically, a deeper network could always match a shallower one: just copy the shallow network's weights into the first layers and set all extra layers to learn identity mappings. The empirical failure to do so reveals that \emph{learning the identity function is hard for standard conv layers}. Residual connections solve this by making the identity the ``default'' path.
+Theoretically, a 56-layer network should be able to match a 20-layer network: just copy the
+shallow network's weights into the first 20 layers and set all extra layers to identity mappings.
+The empirical failure to do this reveals that \emph{learning the identity function is surprisingly
+hard for standard conv layers}.  If a layer's input is already a good representation, the layer
+needs to output exactly what came in — but gradient descent on a stack of conv layers with random
+initialisation has no particular reason to converge to the identity.  Residual connections solve
+this by making the identity the \emph{default} (zero-cost) path.
 \end{insightbox}
 
 \subsubsection{Residual Block}
 
-The central idea of ResNet is simple: instead of asking a stack of layers to learn a mapping \emph{from scratch}, give the input a direct path to the output (the \term{skip connection} or \term{shortcut}), and ask the layers to learn only what needs to \emph{change} — the \emph{residual}.
-
-Concretely, suppose a block receives input $\mathbf{x}$ and we want it to compute some desired mapping $\mathcal{H}(\mathbf{x})$. Rather than having the conv layers approximate $\mathcal{H}(\mathbf{x})$ directly, we rewrite the target as:
+The central idea: instead of asking a block to learn a mapping $\mathcal{H}(\mathbf{x})$ from
+scratch, rewrite the target as:
 \[
-  \mathcal{H}(\mathbf{x}) = \underbrace{\mathcal{F}(\mathbf{x})}_{\text{learned by conv layers}} + \underbrace{\mathbf{x}}_{\text{identity shortcut}}
+  \mathcal{H}(\mathbf{x}) = \underbrace{\mathcal{F}(\mathbf{x})}_{\text{learned by conv layers}}
+                            + \underbrace{\mathbf{x}}_{\text{identity shortcut}},
 \]
-where $\mathcal{F}(\mathbf{x}) \coloneqq \mathcal{H}(\mathbf{x}) - \mathbf{x}$ is the \term{residual} — the difference between the desired output and the input. The skip connection adds $\mathbf{x}$ directly to the output of the conv layers \emph{without} passing through any weights.
+where $\mathcal{F}(\mathbf{x}) \coloneqq \mathcal{H}(\mathbf{x}) - \mathbf{x}$ is the
+\term{residual} — only the \emph{correction} to the input is learned, not the full mapping.
+The skip connection adds $\mathbf{x}$ to the output of the conv layers via an element-wise addition,
+\emph{without any learnable parameters on the skip path}.
 
-\medskip
-\textbf{Why is this easier to optimise?} If the block should ideally do nothing (i.e.\ $\mathcal{H}(\mathbf{x}) = \mathbf{x}$), the conv layers only need to learn $\mathcal{F}(\mathbf{x}) = 0$ — drive all weights to zero. Pushing weights toward zero is much easier than pushing them to reproduce an arbitrary identity mapping. In practice, most blocks in a trained ResNet learn small residuals, meaning each block makes only a minor correction to the representation rather than a wholesale transformation.
+\textbf{Why this is easier to optimise.}  If the block should ideally do nothing
+($\mathcal{H}(\mathbf{x}) = \mathbf{x}$), the conv layers only need to learn
+$\mathcal{F}(\mathbf{x}) = \mathbf{0}$ — drive all weights toward zero.  Pushing weights toward
+zero via gradient descent is far easier than learning an arbitrary identity mapping.  In practice,
+trained ResNets show that most blocks learn \emph{small} residuals, suggesting each block makes
+only a minor refinement to the representation.
 
 \begin{defbox}{Residual Block}
-A residual block consists of two (or three) conv layers arranged so that the input $\mathbf{x}$ bypasses them via a skip connection:
+A basic residual block (used in ResNet-18/34) consists of two $3\times3$ conv layers with a skip
+connection:
 \[
-  \text{output} = \sigma\!\bigl(\mathcal{F}(\mathbf{x}) + \mathbf{x}\bigr)
+  \text{output} = \sigma\!\bigl(\mathcal{F}(\mathbf{x}) + \mathbf{x}\bigr),
 \]
 where:
 \begin{itemize}
-  \item $\mathcal{F}(\mathbf{x})$ is the output of the stacked conv layers (two $3\times3$ convs in the basic block), with no final activation before the addition.
-  \item $\mathbf{x}$ is the \term{identity shortcut}: the raw input added element-wise to $\mathcal{F}(\mathbf{x})$.
-  \item $\sigma$ is a ReLU applied \emph{after} the addition — not between the two conv layers and the shortcut.
+  \item $\mathcal{F}(\mathbf{x}) = W_2\,\sigma(W_1 \mathbf{x})$ is the output of the two conv
+    layers (BN and ReLU between them; \emph{no} final activation before the addition).
+  \item $\mathbf{x}$ is the \term{identity shortcut} — added element-wise with no weights.
+  \item $\sigma$ is ReLU, applied \emph{after} the addition.
 \end{itemize}
-
-\medskip
-\textbf{Shape constraint.} The element-wise addition requires $\mathcal{F}(\mathbf{x})$ and $\mathbf{x}$ to have exactly the same shape (same height, width, and number of channels). This is automatically satisfied as long as the block does not change spatial size or channel count. If either does change (e.g.\ when transitioning between stages), a \emph{projection shortcut} — a $1\times1$ conv applied to $\mathbf{x}$ — is used to match dimensions before the addition.
+\textbf{Shape constraint.}  Element-wise addition requires $\mathcal{F}(\mathbf{x})$ and
+$\mathbf{x}$ to have \emph{identical} shape (height, width, channels).  When a block changes
+spatial resolution or channel count (e.g.\ at stage boundaries), a \term{projection shortcut}
+— a $1\times1$ conv with stride $s$ — is applied to $\mathbf{x}$ to match dimensions:
+\[
+  \text{output} = \sigma\!\bigl(\mathcal{F}(\mathbf{x}) + W_s\,\mathbf{x}\bigr),
+  \quad W_s \in \mathbb{R}^{C_{\text{out}} \times C_{\text{in}} \times 1 \times 1}.
+\]
 \end{defbox}
+
+\textbf{BatchNorm in ResNet.}  Every conv layer in ResNet is followed by
+\term{Batch Normalisation} before the activation.  This is essential: without BN, training
+networks of 50+ layers with residual connections still diverges.  BN stabilises the distribution
+of activations entering each layer, keeps gradients well-conditioned, and effectively acts as
+a strong regulariser — allowing ResNet to be trained without dropout.
 
 \begin{lstlisting}[caption={Residual block in Keras (same spatial size, same channels)}]
 # Input x; filters = number of filters; name = block identifier
-s1 = tf.keras.layers.Conv2D(filters=filters, kernel_size=3,
-        padding='same', activation='relu', name='conv_'+name+'_1')(x)
-s2 = tf.keras.layers.Conv2D(filters=filters, kernel_size=3,
-        padding='same', activation=None,  name='conv_'+name+'_2')(s1)
+s1 = tf.keras.layers.Conv2D(filters, 3, padding='same', use_bias=False,
+                             name='conv_'+name+'_1')(x)
+s1 = tf.keras.layers.BatchNormalization(name='bn_'+name+'_1')(s1)
+s1 = tf.keras.layers.ReLU()(s1)
+s2 = tf.keras.layers.Conv2D(filters, 3, padding='same', use_bias=False,
+                             activation=None, name='conv_'+name+'_2')(s1)
+s2 = tf.keras.layers.BatchNormalization(name='bn_'+name+'_2')(s2)
 # Skip connection: add input directly (same spatial size & channels)
 s3 = tf.keras.layers.Add(name='add_'+name)([x, s2])
 s4 = tf.keras.layers.ReLU(name='relu_'+name)(s3)
@@ -2060,9 +2755,13 @@ s5 = tf.keras.layers.MaxPooling2D(name='pool_'+name)(s4)
 
 \begin{warnbox}[ResNet implementation details]
 \begin{itemize}
-  \item Spatial size must \emph{not} change within a residual block (padding='same', stride=1 in conv layers). Downsampling goes outside the block.
-  \item The ReLU activation is applied \emph{after} the addition $\mathcal{F}(\mathbf{x}) + \mathbf{x}$, not before.
-  \item Channel dimensionality must match between the skip connection and $\mathcal{F}(\mathbf{x})$. Use $1\times1$ conv on the skip path to adjust if necessary.
+  \item Conv layers inside a residual block: \texttt{padding='same'}, \texttt{stride=1},
+    \texttt{use\_bias=False} (bias is redundant when followed by BN).
+    Downsampling (stride 2) goes \emph{outside} the block.
+  \item ReLU is applied \emph{after} the addition $\mathcal{F}(\mathbf{x}) + \mathbf{x}$,
+    not between the two conv layers and the shortcut.
+  \item If channel counts differ between skip path and $\mathcal{F}(\mathbf{x})$, use a
+    $1\times1$ conv (projection shortcut) on the skip path to match dimensions before addition.
 \end{itemize}
 \end{warnbox}
 
@@ -2136,30 +2835,56 @@ s5 = nn.MaxPool2d(kernel_size=2, stride=2)(s4)
 \label{sec:mobilenet}
 %------------------------------------------------------------
 
-\term{MobileNet} (Howard et al., arXiv 2017) is designed for deployment on mobile and embedded devices with constrained compute and memory. Its key idea: replace standard Conv2D with \term{depthwise separable convolutions}.
+ResNet solved the optimisation problem and enabled very deep networks.  But for deployment on
+mobile phones or embedded devices, the limiting factor is not accuracy but \emph{computational
+cost per inference}.  \term{MobileNet} (Howard et al., arXiv 2017) introduced a drop-in
+replacement for standard convolutions that reduces cost by $\sim$8$\times$ with minimal accuracy
+loss.
 
 \subsubsection{Depthwise Separable Convolution}
 
-A standard $k\times k$ convolution on a $D_F \times D_F \times M$ input producing $N$ output channels requires $D_K^2 \cdot M \cdot D_F^2 \cdot N$ operations. Depthwise separable convolution splits this into two steps:
+Let the input feature map have spatial size $D_F \times D_F$ and $M$ channels.  A standard
+$D_K \times D_K$ convolution producing $N$ output channels requires:
+\[
+  \text{Cost}_{\text{std}} = D_K^2 \cdot M \cdot N \cdot D_F^2 \quad \text{(multiply-adds)}.
+\]
+Depthwise separable convolution splits this single operation into two:
 
 \begin{defbox}{Depthwise Separable Convolution}
 \begin{enumerate}
-  \item \textbf{Depthwise convolution:} apply one $k\times k$ filter per input channel independently (no cross-channel mixing). Cost: $D_K^2 \cdot M \cdot D_F^2$.
-  \item \textbf{Pointwise convolution:} apply $N$ filters of size $1\times1$ across all channels to mix channel information. Cost: $M \cdot D_F^2 \cdot N$.
+  \item \textbf{Depthwise convolution:} apply one $D_K \times D_K$ filter
+    \emph{independently to each of the $M$ input channels} (no cross-channel mixing).
+    Cost: $D_K^2 \cdot M \cdot D_F^2$.
+  \item \textbf{Pointwise convolution:} apply $N$ filters of size $1\times1$ to mix
+    channel information and produce $N$ output channels.
+    Cost: $1^2 \cdot M \cdot N \cdot D_F^2 = M \cdot N \cdot D_F^2$.
 \end{enumerate}
-\textbf{Total cost:} $D_K^2 \cdot M \cdot D_F^2 + M \cdot D_F^2 \cdot N = D_F^2 M (D_K^2 + N)$
+\textbf{Total cost:} $D_F^2 \cdot M \cdot (D_K^2 + N)$.
 \end{defbox}
 
 \subsubsection{Computational Saving}
 
 \[
-\frac{\text{Depthwise Separable cost}}{\text{Standard Conv cost}} = \frac{D_K^2 + N}{D_K^2 \cdot N} = \frac{1}{N} + \frac{1}{D_K^2}
+\frac{\text{Cost}_{\text{dw-sep}}}{\text{Cost}_{\text{std}}}
+= \frac{D_F^2 \cdot M \cdot (D_K^2 + N)}{D_K^2 \cdot M \cdot N \cdot D_F^2}
+= \frac{1}{N} + \frac{1}{D_K^2}.
 \]
 
-For $D_K = 3$ and $N = 256$: saving factor $\approx 1/9 \approx 8\times$ fewer operations with minimal accuracy loss.
+For $D_K = 3$ (a $3\times3$ filter) and $N = 256$ output channels:
+\[
+  \frac{1}{256} + \frac{1}{9} \approx \frac{1}{8.6}
+  \quad\Longrightarrow\quad \approx\mathbf{8\times\text{ fewer operations}}.
+\]
+The accuracy drop on ImageNet is typically only 1--2\% compared to a standard conv network of
+the same depth.
 
 \begin{insightbox}[Intuition behind depthwise separable convolution]
-Standard convolution conflates two operations: (1) spatial feature detection within each channel, and (2) cross-channel feature combination. Depthwise separable convolution disentangles these: the depthwise step does spatial filtering per channel, and the pointwise step combines channels. This factorisation preserves most of the representational power at a fraction of the cost.
+Standard convolution conflates two operations: (1) \emph{spatial} feature detection within each
+channel, and (2) \emph{cross-channel} feature combination.  Depthwise separable convolution
+disentangles them: the depthwise step does spatial filtering per channel independently, and the
+pointwise step linearly combines channels.  This factorisation preserves most of the
+representational power at a fraction of the cost — the key insight is that spatial and channel
+correlations can be modelled separately without much loss of expressiveness.
 \end{insightbox}
 
 %------------------------------------------------------------
@@ -2278,14 +3003,41 @@ Transition layers (conv + pool) between dense blocks reduce spatial size and cha
 \label{sec:efficientnet}
 %------------------------------------------------------------
 
-\term{EfficientNet} (Tan \& Le, ICML 2019) introduces \term{compound scaling}: simultaneously and uniformly scaling network \emph{depth}, \emph{width}, and \emph{input resolution} using a single compound coefficient $\phi$:
-\[
-\text{depth:}\; d = \alpha^\phi, \quad \text{width:}\; w = \beta^\phi, \quad \text{resolution:}\; r = \gamma^\phi, \quad \text{s.t.}\; \alpha \cdot \beta^2 \cdot \gamma^2 \approx 2
-\]
-The base network (EfficientNet-B0) is found by neural architecture search (NAS), and the $\alpha, \beta, \gamma$ coefficients are determined empirically. EfficientNet-B7 achieves state-of-the-art accuracy with an order of magnitude fewer parameters than comparable ResNets.
+All previous architectures scaled along a \emph{single} dimension: VGG went deeper, Wide ResNet
+went wider, and higher-resolution inputs improved accuracy.  \term{EfficientNet} (Tan \& Le, ICML
+2019) asked: \emph{what is the best way to scale all three dimensions simultaneously?}
 
-\begin{insightbox}[Why compound scaling?]
-Intuitively: larger input resolutions require deeper networks (larger receptive fields) and wider networks (more channels to capture fine details). Scaling only one dimension at a time is suboptimal. Compound scaling finds the right balance, matching the available compute budget while maximising accuracy.
+\begin{defbox}{Compound Scaling}
+EfficientNet scales network depth $d$, width $w$, and input resolution $r$ together using a
+single compound coefficient $\phi$:
+\[
+  d = \alpha^\phi, \quad w = \beta^\phi, \quad r = \gamma^\phi,
+  \quad \text{subject to} \quad \alpha \cdot \beta^2 \cdot \gamma^2 \approx 2,
+  \quad \alpha \geq 1,\; \beta \geq 1,\; \gamma \geq 1.
+\]
+The constraint $\alpha \cdot \beta^2 \cdot \gamma^2 \approx 2$ ensures that the total
+\textbf{FLOP cost} doubles with each unit increase in $\phi$.  This is because:
+\begin{itemize}
+  \item FLOPs scale linearly with depth $d$.
+  \item FLOPs scale as $\beta^2$ with width (doubling channels quadruples parameters \emph{and}
+    multiply-adds in each conv layer).
+  \item FLOPs scale as $\gamma^2$ with resolution (doubling spatial size quadruples the number
+    of positions to convolve over).
+\end{itemize}
+Fixing the total FLOP budget and optimising $\alpha,\beta,\gamma$ jointly via a small grid
+search gives the best balanced allocation.
+\end{defbox}
+
+The base network (EfficientNet-B0) is found by neural architecture search (NAS) on a small budget,
+and $\alpha, \beta, \gamma$ are determined by a small grid search at $\phi=1$.  Scaling up with
+$\phi = 1, \ldots, 7$ gives EfficientNet-B1 through B7.  EfficientNet-B7 achieves state-of-the-art
+accuracy with an order of magnitude fewer parameters than comparable ResNets.
+
+\begin{insightbox}[Why compound scaling outperforms single-axis scaling]
+Intuitively: larger input resolutions require deeper networks to capture the full receptive field,
+\emph{and} wider networks to capture the finer details.  Scaling only one dimension is suboptimal
+because the other two become bottlenecks.  Compound scaling finds the right balance so that each
+unit of compute budget is used as efficiently as possible.
 \end{insightbox}
 
 %------------------------------------------------------------
@@ -2571,7 +3323,17 @@ Augmented Grad-CAM & Super-resolved Grad-CAM via augmentation + inverse problem.
 All methods produce class-specific heat-maps of the same form: a weighted combination of spatial signals. The key difference is \emph{where the weights come from} (learned FC weights vs.\ gradients) and \emph{what signal is weighted} (feature maps vs.\ input pixels).
 \end{tcolorbox}
 
-The conceptual link is this: CAM and Grad-CAM are both performing the same operation — weighting spatial feature maps by their importance to a class and summing — but CAM reads the importance weights from the trained FC layer, while Grad-CAM \emph{computes} them on-the-fly using gradients. This is why Grad-CAM reduces exactly to CAM when the architecture has GAP + single FC (the gradient average equals the FC weight in that special case).
+The conceptual link is this: CAM and Grad-CAM are both performing the same operation — weighting spatial feature maps by their importance to a class and summing — but CAM reads the importance weights from the trained FC layer, while Grad-CAM \emph{computes} them on-the-fly using gradients.
+
+\begin{warnbox}[Exam trap: do CAM and Grad-CAM give the same maps on a GAP + single-FC network?]
+It can be shown that on a network with GAP followed by a \emph{single} FC layer, the Grad-CAM weights $w_k^c = \frac{1}{nm}\sum_{i,j}\frac{\partial y^c}{\partial a_k(i,j)}$ are \textbf{proportional} to the CAM weights $w_k^c$ (the FC layer weights) — they encode the same ranking of feature-map importance.
+
+However, \textbf{the two maps are not identical}: the absolute scale of the weights differs (gradients are scaled by the softmax derivative, which depends on the current prediction confidence), so the resulting heat-maps will look similar in shape but have different numerical values.
+
+\textbf{The correct exam statement is:} Grad-CAM \emph{reduces to} CAM (up to a scalar factor) on a GAP + single-FC architecture. The maps highlight the same spatial regions, but the aggregation weights are technically different quantities.
+
+In contrast, on any architecture with \emph{multiple FC layers or no GAP}, CAM cannot be computed at all, while Grad-CAM can — this is the key advantage of Grad-CAM.
+\end{warnbox}
 
 %------------------------------------------------------------
 \subsubsection{Grad-CAM}
@@ -2645,7 +3407,7 @@ These techniques have direct real-world impact. The \term{ODIN} platform, develo
 This is a compelling demonstration of how cheap classification-level supervision can yield actionable spatial predictions at scale.
 
 %------------------------------------------------------------
-\subsection{Recap: Lecture 10 Key Points}
+\subsection{Recap: Localisation, CAM, and Explainability}
 %------------------------------------------------------------
 
 \begin{tcolorbox}[colback=WarningRedBg,colframe=WarningRed,boxrule=0.8pt,arc=3pt]
@@ -2746,7 +3508,7 @@ This equivalence means we can replace every FC layer in a pre-trained CNN with a
 
 \subsubsection{FC-CNN Output: Heatmaps}
 
-When a larger image of size $(H + \delta) \times (W + \delta)$ is fed to the FC-CNN, each spatial position $(u,v)$ in the output heatmap corresponds to the receptive field of that position in the input — i.e.\ it reports the class probability for the image region that ``fed into'' output unit $(u,v)$. The output heatmap has lower resolution than the input due to cumulative pooling and striding in the encoder.
+A fully convolutional CNN can process input images of different sizes. If a larger image fo size $(H + \delta) \times (W +\delta)$ is given as input, the network produces a correspondigly larger ouput heatmap. Each spatial position $(u,v)$ in this heatmap corresponds to a specific region of the input image (its receptive field), and the network outputs class scores for that region. Because of pooling and striding, the heatmap has lower spatial resolution than the input image.
 
 Applying softmax independently at each spatial position gives a $K$-channel output tensor (one channel per class). The predicted label map is obtained by taking $\arg\max$ along the class dimension:
 \[
@@ -2797,37 +3559,91 @@ The natural solution to the resolution--semantics tension is a two-stage archite
 
 \subsubsection{Standard Upsampling Primitives}
 
-Several operations can increase spatial resolution.
+Several operations can increase spatial resolution. We describe them in increasing order of sophistication.
 
-\textbf{Bilinear interpolation} uses the standard image-upsampling formula to place output values between known input positions. It is non-learnable and parameter-free.
+\paragraph{Nearest-neighbour upsampling.}
+The simplest strategy: each input value is \emph{replicated} to fill all positions of its corresponding $s\times s$ output block (where $s$ is the upsampling factor). The result is blocky but fast and parameter-free.
 
-\textbf{Bed-of-nails (nearest-neighbour) upsampling} copies each input value to the top-left corner of its corresponding $s\times s$ block of output positions, filling the rest with zeros ($s$ is the upsampling factor). Again non-learnable.
+\paragraph{Bilinear interpolation.}
+Rather than replicating values, bilinear interpolation \emph{smoothly blends} neighbouring input values to estimate the content at each output position. It proceeds in two passes of 1-D linear interpolation: first along the horizontal axis, then along the vertical axis (hence \emph{bi}-linear).
 
-\textbf{Max-unpooling} is the inverse of max-pooling: the positions of the maxima are recorded during the downsampling forward pass (\emph{pooling switches}), and during upsampling the values are placed back at those exact positions, with zeros elsewhere. This preserves the precise location of the strongest activations.
+Formally, suppose we want to estimate the value at a continuous position $(x,y)$ that falls inside the unit cell defined by the four nearest input grid points
+\[
+  Q_{11}=(x_1,y_1),\quad Q_{12}=(x_1,y_2),\quad Q_{21}=(x_2,y_1),\quad Q_{22}=(x_2,y_2).
+\]
+Define the normalised offsets $t = (x-x_1)/(x_2-x_1)$ and $u = (y-y_1)/(y_2-y_1)$, both in $[0,1]$. First, interpolate horizontally at each of the two rows:
+\[
+  R_1 = (1-t)\,Q_{11} + t\,Q_{21}, \qquad R_2 = (1-t)\,Q_{12} + t\,Q_{22}.
+\]
+Then interpolate vertically between the two results:
+\[
+  \hat{f}(x,y) = (1-u)\,R_1 + u\,R_2.
+\]
+Expanding, this is a weighted average of the four corners with weights equal to the area of the \emph{opposite} sub-rectangle:
+\[
+  \hat{f}(x,y) = (1-t)(1-u)\,Q_{11} + t(1-u)\,Q_{21} + (1-t)u\,Q_{12} + tu\,Q_{22}.
+\]
+Bilinear interpolation is smooth, parameter-free, and fast. Its limitation in segmentation is that the weights depend only on \emph{geometry} (how close the query point is to each corner), not on image content. It therefore cannot recover sharp boundaries or fine structures — it always produces a blurry, smoothly varying surface.
+
+\paragraph{Bed-of-nails upsampling.}
+Each input activation is placed at a \emph{single} position inside its $s\times s$ output block (typically the top-left corner), with all other positions set to zero. Unlike nearest-neighbour, this does \emph{not} replicate the value — the output is sparse. Bed-of-nails is not useful on its own, but it is the conceptual stepping stone to transpose convolution: a subsequent learned convolution can then spread and blend the sparse activations in a task-adaptive way.
+
+\paragraph{Max-unpooling.}
+This is the exact inverse of max-pooling and requires information from the encoder. During the downsampling forward pass, each max-pooling operation records not just the maximum value but also its \emph{location} within the pooling window — these are called \textbf{pooling switches}. During upsampling, each value is placed back at its recorded location, with zeros elsewhere. Because the precise spatial position of the dominant activation is preserved, max-unpooling produces sharper feature maps than nearest-neighbour or bilinear upsampling. Networks such as SegNet store the pooling switches from each encoder level and pass them to the corresponding decoder level, creating a symmetric encoder-decoder coupling.
 
 \subsubsection{Trainable Upsampling: Transpose Convolution}
 
-Non-learnable upsampling discards information; the network cannot adapt the upsampling to the task. \term{Transpose convolution} (also called \emph{fractionally strided convolution} or, misleadingly, \emph{deconvolution}) introduces learnable parameters into the upsampling step.
+All the primitives above are \emph{non-learnable}: the upsampling kernel is fixed by geometry, not trained from data. The network therefore cannot adapt the reconstruction to the task. The fundamental question is: can we design a learnable operation that, like a standard convolution, is parameterised by a filter that is trained end-to-end, but that \emph{increases} spatial resolution instead of preserving or reducing it?
 
-\begin{defbox}{Transpose Convolution}
-A transpose convolution with kernel size $k$ and stride $s$ maps an input of spatial size $n$ to an output of spatial size approximately $s \cdot n$. For each input activation at position $p$, the filter $F \in \mathbb{R}^{k \times k \times C_\text{in} \times C_\text{out}}$ is multiplied by that activation and placed at the corresponding output position, with appropriate stride. Overlapping contributions are summed.
+\term{Transpose convolution} (also called \emph{fractionally strided convolution}; colloquially but misleadingly, \emph{deconvolution}) answers this question.
 
-Equivalently, a transpose convolution is the gradient of a standard convolution with the same filter: it ``reverses'' the spatial compression of a strided convolution.
+\paragraph{Intuition: reversing a strided convolution.}
+Recall that a standard convolution with stride $s>1$ \emph{reduces} spatial resolution by a factor of $s$: it slides a small filter over the input and computes one output value for every $s$ input positions. A transpose convolution does the opposite: for each \emph{input} activation, it \emph{spreads} a scaled copy of the filter across the output, advancing by $s$ output positions per input step. Where multiple spread copies overlap, their contributions are summed. The result is an output that is roughly $s$ times larger than the input.
+
+\paragraph{The zero-insertion view.}
+A cleaner way to see this is to split the operation in two steps:
+\begin{enumerate}
+  \item \textbf{Zero insertion.} Upsample the input by inserting $s-1$ zeros between every pair of adjacent input values along each axis. An input of size $n$ becomes an intermediate tensor of size $s(n-1)+1$.
+  \item \textbf{Standard (full) convolution.} Apply a regular convolution (with no stride, full padding) of kernel size $k$ to the zero-inserted tensor. This replaces each zero with a learned weighted combination of its neighbours, effectively filling in the gaps.
+\end{enumerate}
+The kernel in step 2 is the \emph{learned} parameter. Training it end-to-end allows the network to discover the best way to fill in the missing spatial detail for the task at hand.
+
+\paragraph{Output size formula.}
+For a 1-D input of size $n$, kernel size $k$, stride $s$, and zero-padding $p$ applied to the output, the output size is:
+\[
+  n_\text{out} = s(n-1) + k - 2p.
+\]
+The most common setting for $2\times$ upsampling uses $s=2$, $k=2$, $p=0$, giving $n_\text{out} = 2n$.
+
+\paragraph{The matrix-transpose connection (origin of the name).}
+A standard convolution can be written as a matrix multiplication: $\mathbf{y} = C\,\mathbf{x}$, where $C$ is a sparse Toeplitz matrix whose non-zero entries are the filter weights. A strided convolution has more columns than rows in $C$ — it maps a large input to a smaller output. Backpropagating through this operation requires multiplying by $C^\top$, which maps from the smaller output space back to the larger input space. A transpose convolution is exactly this operation $C^\top\mathbf{x}$ applied as a \emph{forward} pass. This is why the operation is called a transpose convolution, and why it is also known as the \emph{backward pass of a standard convolution}.
+
+\begin{defbox}{Transpose Convolution — Summary}
+\textbf{Forward pass.} For each input activation at position $i$, multiply the learned filter $F \in \mathbb{R}^{k \times k \times C_\text{in} \times C_\text{out}}$ by that scalar and add the result to the output at position $s \cdot i$ (with appropriate indexing). Overlapping contributions are accumulated by summation.
+
+\textbf{Output size} (1-D, padding $p$):
+\[
+  n_\text{out} = s(n-1) + k - 2p.
+\]
+
+\textbf{Equivalently}: zero-insert $s-1$ zeros between each pair of input values, then apply a standard full convolution with kernel $F$.
+
+\textbf{Matrix view}: if the corresponding standard convolution is $\mathbf{y}=C\mathbf{x}$, the transpose convolution computes $C^\top\mathbf{x}$.
 \end{defbox}
 
 \begin{notebox}[Naming confusion]
-The name ``deconvolution'' is commonly used for transpose convolution but is \textbf{highly misleading}: true deconvolution is a signal-processing operation that inverts the blurring effect of a filter. Transpose convolution does not invert blurring — it learns to upsample. The correct names are \emph{transpose convolution}, \emph{fractionally strided convolution}, or \emph{backward strided convolution}.
+The name ``deconvolution'' is common in the deep learning literature but is \textbf{highly misleading}. In signal processing, deconvolution is the operation that inverts the blurring effect of a known filter — it \emph{undoes} a convolution. Transpose convolution does no such thing: it does not invert or undo any previous convolution, nor does it recover the original signal. It is simply a learnable upsampling layer. The correct names are \emph{transpose convolution}, \emph{fractionally strided convolution}, or \emph{backward strided convolution}.
 \end{notebox}
 
-A typical decoder block combines upsampling with learnable refinement:
+A typical decoder block pairs a transpose convolution (for upsampling) with standard convolutions (for feature refinement):
 \[
-  \textbf{Upsample}({\times}2) \;\to\; \textbf{Conv2D} + \text{ReLU} \;\to\; \textbf{Conv2D} + \text{ReLU}
+  \underbrace{\text{TransposeConv}({\times}2)}_{\text{upsample}} \;\to\; \underbrace{\text{Conv2D} + \text{BN} + \text{ReLU} \;\to\; \text{Conv2D} + \text{BN} + \text{ReLU}}_{\text{refine features}}
 \]
-By adjusting the number of filters in the final convolutional layer one controls the output channel depth. Batch normalisation and dropout can be inserted between layers. The block can be repeated to achieve any upsampling factor.
+By controlling the number of output channels of the transpose convolution and the subsequent layers, one adjusts the channel depth at each decoder stage. The block is repeated until the target spatial resolution is reached.
 
-\subsubsection{Upsampling Filters as Bilinear Initialisation}
+\subsubsection{Upsampling Filters Initialised as Bilinear Kernels}
 
-Upsampling can also be implemented as a standard convolution applied to a \emph{fractional stride} input (the input inserted into a grid of zeros with stride $1/s$). Long et al.\ showed that initialising these upsampling filters as bilinear interpolation kernels is a good starting point, and they can then be fine-tuned during training on the segmentation dataset.
+An important practical observation: the zero-insertion view of transpose convolution shows that the learned filter is responsible for \emph{interpolating} the sparse, zero-inserted input. A natural initialisation is therefore the bilinear interpolation kernel — since bilinear interpolation is already a good general-purpose interpolator, it provides a sensible starting point that can then be fine-tuned by gradient descent on the target task. Long et al.\ (FCN, 2015) showed that this initialisation accelerates training and improves final segmentation quality compared to random initialisation, because the network starts from a state that already produces smooth, reasonable upsampled outputs rather than noise.
 
 \subsubsection{Training Loss for Dense Prediction}
 
@@ -2990,7 +3806,7 @@ One practical workaround is to train on \textbf{grid-sampled patch annotations}:
 This approach achieves efficient inference from a vanilla classification network trained on fewer than 31\,000 patches of size $200\times 200$, with segmentation quality competitive with direct full-annotation methods.
 
 %------------------------------------------------------------
-\subsection{Recap: Lecture 11 Key Points}
+\subsection{Recap: Semantic Segmentation}
 \label{sec:recap_semseg}
 %------------------------------------------------------------
 
@@ -3240,7 +4056,8 @@ Fast R-CNN (Girshick, ICCV 2015) eliminated the redundant per-proposal convoluti
 \begin{enumerate}
   \item Feed the whole image to a CNN backbone (e.g.\ VGG16 up to \texttt{conv5}) to compute a single set of convolutional feature maps. Convolutional computation is performed \textbf{once} and \textbf{shared} across all proposals.
   \item Project the region proposals (still from an external algorithm) onto the feature maps.
-  \item \textbf{ROI Pooling}: for each projected region of interest, extract a fixed-size $H \times W$ activation by dividing the ROI into an $H \times W$ grid and applying max-pooling within each cell. This yields a fixed-length vector regardless of the original ROI size.
+  \item \textbf{ROI Pooling}: convert each variable-size region of interest into a fixed-size
+    $H \times W$ feature map (see the full explanation below).
   \item Feed the pooled features through FC layers that simultaneously predict:
     \begin{itemize}
       \item class probabilities via softmax (replacing the external SVM);
@@ -3249,6 +4066,90 @@ Fast R-CNN (Girshick, ICCV 2015) eliminated the redundant per-proposal convoluti
   \item The combined multi-task loss is optimised \textbf{end-to-end} — back-propagation flows through the ROI Pooling layer and through the shared backbone.
 \end{enumerate}
 \end{thmbox}
+
+\subsubsection{ROI Pooling in Detail}
+\label{sec:roi_pooling}
+
+\textbf{The problem ROI Pooling solves.}  After the backbone, we have a spatial feature map of fixed
+stride (e.g.\ $1/16$ of the input resolution for VGG16).  Each region proposal, originally a
+bounding box on the \emph{image}, maps to a rectangle on this feature map — but the rectangles have
+different sizes, because different proposals have different sizes.  The fully-connected layers that
+follow require a \emph{fixed-length} input vector.  ROI Pooling bridges this mismatch.
+
+\begin{defbox}{ROI Pooling}
+Let a region of interest (ROI) project onto a rectangle of height $h$ and width $w$ on the
+convolutional feature map.  \textbf{ROI Pooling} converts this $h \times w$ region into a fixed
+$H \times W$ output by the following procedure:
+
+\begin{enumerate}
+  \item \textbf{Divide into bins.}  Partition the $h \times w$ feature-map rectangle into an
+    $H \times W$ grid of sub-regions (\textbf{bins}).  Each bin covers approximately
+    $\lfloor h/H \rfloor \times \lfloor w/W \rfloor$ feature-map cells (integer rounding is used
+    when $h$ or $w$ is not exactly divisible).
+  \item \textbf{Max-pool within each bin.}  Compute the maximum activation value over all cells
+    inside each bin.  The result is a single scalar per bin.
+  \item \textbf{Assemble the output.}  The $H \times W$ grid of max-pooled scalars forms the output
+    feature map of size $H \times W \times C$ (where $C$ is the number of feature channels; the
+    operation is applied identically to each channel).
+\end{enumerate}
+
+The output size $H \times W$ is a \emph{fixed hyperparameter} (typically $7 \times 7$ in Fast
+R-CNN).  Regardless of whether the input ROI projects to a $5 \times 10$ or $20 \times 30$
+region on the feature map, the output is always $7 \times 7 \times C$, which is then flattened
+to a fixed-length vector for the FC layers.
+\end{defbox}
+
+\textbf{Worked example.}  Suppose $H = W = 2$ (a $2\times2$ output) and a proposal maps to a
+$4\times6$ region on the feature map (single channel, for simplicity).
+The ROI is divided into a $2\times2$ grid of bins, each of size $2\times3$ cells:
+
+\medskip
+\begin{center}
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{cc}
+  \textit{Step 1 — ROI on feature map} & \textit{Step 2 — bins (max-pool each)} \\[4pt]
+  $\begin{pmatrix}
+    1 & 3 & 2 & 5 & 0 & 1 \\
+    4 & 6 & 8 & 2 & 3 & 4 \\
+    2 & 1 & 0 & 7 & 1 & 2 \\
+    5 & 3 & 4 & 6 & 2 & 0
+  \end{pmatrix}$
+  &
+  $\begin{array}{|c|c|}
+    \hline
+    \{1,3,4,6\}\to\mathbf{6} & \{2,5,8,2,0,1,3,4\}\to\mathbf{8} \\
+    \hline
+    \{2,1,5,3\}\to\mathbf{5} & \{0,7,4,6,1,2,2,0\}\to\mathbf{7} \\
+    \hline
+  \end{array}$
+  \\[10pt]
+  \multicolumn{2}{c}{\textit{Step 3 — output}}\\[4pt]
+  \multicolumn{2}{c}{$\begin{pmatrix} 6 & 8 \\ 5 & 7 \end{pmatrix}$}
+\end{tabular}
+\end{center}
+\medskip
+
+The $4\times6$ ROI is split into a $2\times2$ grid of bins (each $2\times3$ cells);
+the maximum within each bin is taken, yielding the fixed $2\times2$ output.
+
+\begin{insightbox}[Why bins matter for gradient flow]
+Because each output value is the max of a whole bin, the gradient during back-propagation flows
+only to the \emph{single cell with the maximum value} within each bin (same as in standard
+max-pooling).  This means ROI Pooling is sub-differentiable but fully usable with standard SGD.
+
+The size of each bin ($\approx h/H$ cells) changes with the ROI size — larger proposals have larger
+bins, so each output neuron summarises a larger receptive field.  This is the key mechanism by which
+ROI Pooling is \emph{size-invariant}: big and small objects both produce the same $H \times W$
+representation, allowing a single set of FC weights to classify proposals of any scale.
+\end{insightbox}
+
+\begin{warnbox}[Quantisation artefacts in ROI Pooling]
+ROI Pooling requires snapping bin boundaries to integer feature-map coordinates (since activations
+exist only at discrete grid positions).  For small ROIs or precise localisation tasks, this
+\emph{quantisation} introduces alignment errors.  \textbf{ROI Align} (used in Mask R-CNN) removes
+this by computing bin values via bilinear interpolation at non-integer grid positions, yielding
+significantly better mask and keypoint accuracy.
+\end{warnbox}
 
 After Fast R-CNN, the bottleneck shifted entirely to the external region proposal step (e.g.\ Selective Search), which is not learned and contributes the vast majority of the total test time.
 
@@ -3417,7 +4318,7 @@ where $k_0 = 4$ is the reference level for a $224 \times 224$ ROI. Larger object
 Architectures such as U-Net also combine features at multiple resolutions via skip connections, but they produce a \emph{single} output feature map for inference. FPN, by contrast, makes \emph{independent predictions at each pyramid level}, which is essential for detecting objects across different scales. FPN is not a detector by itself; it is a \emph{feature extractor backbone} that plugs into any region-based detector (RPN, Fast R-CNN, Faster R-CNN) to give it multi-scale capability without significantly increasing test-time cost.
 
 %------------------------------------------------------------
-\subsection{Recap: Lecture 12 Key Points}
+\subsection{Recap: Localisation and Object Detection}
 \label{sec:recap_detection}
 %------------------------------------------------------------
 
@@ -4074,12 +4975,126 @@ Consider a 10-gram language model on a vocabulary of $|V| = 100{,}000$ words. Th
 
 \subsubsection{Continuous Representations: Beyond N-grams}
 
-An alternative family of methods replaces the discrete count-based approach with \emph{continuous} representations of words. These include:
+An alternative family of methods replaces the discrete count-based approach with \emph{continuous} representations of words. They all exploit the \term{distributional hypothesis}: the meaning of a word can be inferred from the contexts in which it appears. Three major approaches exist, and understanding all three clarifies exactly what distributed neural embeddings add over their predecessors.
+
+%------------------------------------------------------------
+\paragraph{Latent Semantic Analysis (LSA).}
+
+\term{Latent Semantic Analysis} (Deerwester et al., 1990) is the oldest and most principled of the three. The idea is to build a co-occurrence matrix and then compress it with linear algebra.
+
+\textbf{Step 1 — Build the term-document matrix.} Given a corpus of $N$ documents and a vocabulary of $|V|$ words, construct a matrix $\mathbf{X} \in \mathbb{R}^{|V| \times N}$ where entry $X_{ij}$ is (some function of) how many times word $i$ appears in document $j$. Typically, raw counts are replaced by \term{TF-IDF} weights (Term Frequency--Inverse Document Frequency):
+\[
+  \text{TF-IDF}(i, j) = \underbrace{\frac{n_{ij}}{\sum_k n_{kj}}}_{\text{term frequency}}
+                        \times \underbrace{\log \frac{N}{|\{j : n_{ij}>0\}|}}_{\text{inverse document frequency}},
+\]
+which up-weights words that are frequent in a document but rare across the corpus (hence informative), and down-weights stop-words like \textit{the}, \textit{is}, that appear everywhere.
+
+\textbf{Step 2 — Truncated SVD.} Decompose the matrix as:
+\[
+  \mathbf{X} \;\approx\; \mathbf{U}_k \, \mathbf{\Sigma}_k \, \mathbf{V}_k^\top,
+\]
+where $\mathbf{U}_k \in \mathbb{R}^{|V| \times k}$ contains the top-$k$ left singular vectors, $\mathbf{\Sigma}_k \in \mathbb{R}^{k \times k}$ is the diagonal matrix of the $k$ largest singular values, and $\mathbf{V}_k \in \mathbb{R}^{N \times k}$ contains the right singular vectors. This is the best rank-$k$ approximation to $\mathbf{X}$ in the Frobenius norm (Eckart-Young theorem).
+
+\textbf{Step 3 — Use the rows of $\mathbf{U}_k$.} The $i$-th row of $\mathbf{U}_k$ is the $k$-dimensional \emph{latent semantic vector} of word $i$. Words with similar co-occurrence patterns across documents will have similar latent vectors. Typical values: $k \in [100, 300]$.
+
+\begin{insightbox}[What LSA captures and what it misses]
+\textbf{What LSA captures}: words used in similar documents get similar vectors, so synonyms and topically related words cluster together.  LSA was the first method to demonstrate that semantic similarity could be extracted automatically from raw text statistics.
+
+\textbf{What LSA misses}:
 \begin{itemize}
-  \item \textbf{Latent Semantic Analysis (LSA)}: SVD-based factorisation of word--document co-occurrence matrices.
-  \item \textbf{Latent Dirichlet Allocation (LDA)}: probabilistic topic modelling.
-  \item \textbf{Distributed representations} (neural embeddings): the approach we focus on, pioneered by Bengio et al.\ (2003) and dramatically scaled by Mikolov et al.\ (2013).
+  \item \textbf{Word order}: $\mathbf{X}$ is a bag-of-words matrix — the order of words within documents is completely discarded.
+  \item \textbf{Polysemy}: \textit{bank} (financial) and \textit{bank} (river) collapse into a single average vector. SVD cannot separate different senses of the same word.
+  \item \textbf{Non-linearity}: SVD finds the best \emph{linear} low-rank approximation; the true semantic manifold of language is highly non-linear.
+  \item \textbf{Scalability}: the SVD of a $10^6 \times 10^6$ matrix is computationally expensive.
 \end{itemize}
+\end{insightbox}
+
+\begin{warnbox}[LSA vs.\ word2vec at the exam]
+LSA builds a word--document matrix and applies SVD.  Word2vec builds a word--context matrix implicitly through a neural prediction task.  Both produce dense word vectors, but word2vec captures local syntactic patterns (it uses a fixed-size context window) while LSA captures global document-level co-occurrence.  LSA has no nonlinearity and cannot learn compositional features.
+\end{warnbox}
+
+%------------------------------------------------------------
+\paragraph{Latent Dirichlet Allocation (LDA).}
+
+\term{Latent Dirichlet Allocation} (Blei, Ng \& Jordan, 2003) is a fully \emph{generative probabilistic} model of text, not a matrix factorisation.  It assumes documents are mixtures of latent \textbf{topics}, and each topic is a probability distribution over words.
+
+\textbf{Generative story.}
+\begin{enumerate}
+  \item For each topic $k = 1,\ldots,K$: draw a word distribution $\boldsymbol{\phi}_k \sim \mathrm{Dir}(\boldsymbol{\beta})$ (a distribution over $|V|$ words).
+  \item For each document $d$: draw a topic mixture $\boldsymbol{\theta}_d \sim \mathrm{Dir}(\boldsymbol{\alpha})$ (a $K$-dimensional distribution over topics).
+  \item For each word position $n$ in document $d$:
+    \begin{itemize}
+      \item Draw a topic $z_{d,n} \sim \mathrm{Multinomial}(\boldsymbol{\theta}_d)$.
+      \item Draw a word $w_{d,n} \sim \mathrm{Multinomial}(\boldsymbol{\phi}_{z_{d,n}})$.
+    \end{itemize}
+\end{enumerate}
+
+The Dirichlet prior encourages sparse topic mixtures (a document is about a few topics) and sparse word distributions (a topic uses a few distinctive words), which yields interpretable topics.
+
+\textbf{Inference.} Given a corpus, the goal is to infer the posterior $P(\boldsymbol{\theta}, \mathbf{z}, \boldsymbol{\phi} \mid \mathbf{w})$. This is intractable in closed form and approximated via variational inference or collapsed Gibbs sampling.
+
+\textbf{Word representation from LDA.} Once trained, the topic-word matrix $\boldsymbol{\Phi} \in \mathbb{R}^{K \times |V|}$ gives a $K$-dimensional representation for each word (its weight across topics). Alternatively, a word's representation can be taken as the expected topic assignment $P(z \mid w)$.
+
+\begin{insightbox}[What LDA captures and what it misses]
+\textbf{What LDA captures}: document-level thematic structure.  Topics are interpretable clusters of words that co-occur across documents (e.g.\ a \textit{sports} topic might have high probability for \textit{goal}, \textit{player}, \textit{team}, \textit{match}).  LDA is the gold standard for topic modelling and produces human-interpretable topics.
+
+\textbf{What LDA misses}:
+\begin{itemize}
+  \item \textbf{Word order}: same bag-of-words assumption as LSA.
+  \item \textbf{Fine-grained syntax}: topics are coarse, document-level concepts. LDA cannot represent that \textit{run} as a verb (``she runs'') differs from \textit{run} as a noun (``a run of bad luck'').
+  \item \textbf{Word analogies}: LDA produces topic distributions, not geometric vectors; you cannot perform analogy arithmetic (king $-$ man $+$ woman $\approx$ queen).
+  \item \textbf{Scalability}: inference is slow on very large corpora compared to word2vec.
+\end{itemize}
+\end{insightbox}
+
+%------------------------------------------------------------
+\paragraph{Distributed Representations (Neural Word Embeddings).}
+
+\term{Distributed representations} — the approach that word2vec and GloVe implement — differ conceptually from both LSA and LDA in a fundamental way: rather than decomposing an explicit co-occurrence matrix, they learn word vectors \emph{as a side effect of training a neural prediction task on raw text}.
+
+\begin{defbox}{Distributed Representation}
+A representation is \textbf{distributed} if the meaning of a concept is encoded across \emph{many} dimensions of a vector simultaneously, and each dimension participates in the encoding of \emph{many} concepts. This is in contrast to a \textbf{local} (one-hot) representation, where a single unit encodes a single concept and all other units are zero.
+\end{defbox}
+
+The key properties that distinguish distributed representations from LSA and LDA:
+
+\begin{enumerate}
+  \item \textbf{Learned via prediction, not factorisation.}  Word2vec trains a shallow neural network to predict a word from its context (CBOW) or a context from a word (Skip-gram). The embedding matrix is not computed analytically — it is found by gradient descent on a prediction loss. This means the vectors encode the information that is \emph{predictively useful} for the task, which turns out to capture both semantic and syntactic regularities.
+
+  \item \textbf{Non-linear.}  Even though word2vec itself has no hidden layer (it is essentially a bilinear model), the \emph{composition} of embeddings with softmax is nonlinear, and deeper models (e.g.\ NNLM with tanh hidden layers) apply explicit nonlinearities. LDA and LSA are both fundamentally linear.
+
+  \item \textbf{Local context window.}  Word2vec uses a fixed-size window (typically 5--10 words) around each word. This captures syntactic patterns (word order, grammatical roles) that bag-of-words approaches miss entirely.
+
+  \item \textbf{Geometric regularity (the killer feature).}  Distributed representations encode semantic \emph{relationships} as constant \emph{differences} between vectors:
+  \[
+    C(\text{king}) - C(\text{man}) + C(\text{woman}) \approx C(\text{queen}).
+  \]
+  This is an emergent property — it was not engineered in, but arises from training on the prediction task. Neither LSA nor LDA vectors exhibit this clean relational geometry.
+\end{enumerate}
+
+\begin{tcolorbox}[colback=LightBlue,colframe=AccentBlue,boxrule=0.8pt,arc=3pt]
+\textbf{Comparison: LSA vs.\ LDA vs.\ Distributed Representations}\\[6pt]
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{@{}p{0.22\linewidth}p{0.23\linewidth}p{0.23\linewidth}p{0.23\linewidth}@{}}
+\toprule
+\textbf{Property} & \textbf{LSA} & \textbf{LDA} & \textbf{Dist.\ Repr.} \\
+\midrule
+Method & SVD of TF-IDF & Generative model + VI & Neural prediction \\
+Context & Document-level & Document-level & Local window \\
+Word order & Ignored & Ignored & Captured (partially) \\
+Nonlinearity & No & Yes (Dirichlet) & Yes (activation) \\
+Polysemy & No & Partial & Partial \\
+Analogy arithmetic & Weak & No & Strong \\
+Interpretability & Low & High (topics) & Low \\
+Scalability & Slow (SVD) & Slow (inference) & Fast (SGD) \\
+\bottomrule
+\end{tabular}
+\end{tcolorbox}
+
+\begin{insightbox}[Why ``distributed'' is the right word]
+In a one-hot vector, the word \textit{dog} is represented by a single active unit.  In a distributed representation, \textit{dog} is represented by a pattern of activations across 300 dimensions — some dimensions might encode \textit{animacy}, others \textit{size}, others \textit{domesticity}, others \textit{noun-ness}.  No single dimension has a clean interpretation, but the \emph{pattern as a whole} is uniquely identifying and semantically meaningful.  This is why distributed representations are exponentially more expressive than local ones: $n$ binary units can represent $2^n$ distinct concepts distributedly, but only $n$ concepts locally.
+\end{insightbox}
+
 
 %------------------------------------------------------------
 \subsection{The Neural Network Language Model (Bengio et al., 2003)}
@@ -4380,6 +5395,8 @@ In practice, both methods produce embeddings of comparable quality on standard b
   \item \textbf{GloVe (Pennington 2014)}: makes PMI structure explicit; loss $J = \sum_{i,j} f(X_{ij})({\mathbf{w}_i^\top\tilde{\mathbf{w}}_j + b_i + \tilde{b}_j - \log X_{ij}})^2$; $f(x)$ down-weights very frequent pairs; final embedding $= \mathbf{w}_i + \tilde{\mathbf{w}}_i$; same linear regularities as word2vec; global co-occurrence vs.\ local window training.
 \end{enumerate}
 \end{tcolorbox}
+
+\printindex
 
 \end{document}
 
