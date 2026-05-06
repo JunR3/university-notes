@@ -2437,398 +2437,973 @@ fields and layer outputs.
 \label{sec:cnn_viz}
 %------------------------------------------------------------
 
-Understanding \emph{what} a CNN has learned is important both for interpretability and for building better models.
+\subsubsection{Why Visualise?}
 
+Training a CNN produces millions of numerical weights — but \emph{what has the network actually learned?}
+Visualisation techniques try to answer this question. The motivations are both scientific and practical:
+
+\begin{itemize}
+  \item \textbf{Interpretability and trust.} Before deploying a model in a safety-critical application (medical imaging, autonomous driving), one needs evidence that it is using \emph{meaningful} features rather than dataset artefacts.
+  \item \textbf{Debugging.} If a network performs poorly, visualisation can reveal whether the issue is in early feature extraction or in high-level reasoning.
+  \item \textbf{Detecting ``Clever Hans'' behaviour.} A famous failure mode: a horse-classification network achieved near-perfect accuracy because training images of horses happened to contain a watermark from one photographic agency. The network had learned to recognise the watermark, not the horse. Saliency-based visualisation revealed this. Without it, the bug would have remained invisible.
+  \item \textbf{Scientific insight.} Visualisations reveal that CNNs trained on natural images spontaneously develop detectors reminiscent of neurons in the mammalian visual cortex — providing a productive dialogue between deep learning and computational neuroscience.
+\end{itemize}
+
+There are three complementary families of visualisation methods, ordered from simplest to most powerful:
+(1) \textbf{filter visualisation} (look directly at the learned weights of the first layer);
+(2) \textbf{maximally activating patches} (find real images that most excite a given neuron);
+(3) \textbf{gradient ascent / synthetic image generation} (synthesise an image from scratch that maximally activates a neuron or class score).
+
+%------------------------------------------------------------
 \subsubsection{Visualising First-Layer Filters}
+%------------------------------------------------------------
 
-The first convolutional layer filters are $3\times3$ or $11\times11$ RGB tensors, directly visualisable as images. In AlexNet, first-layer filters resemble Gabor-like edge detectors and colour blob detectors — consistent with V1 neurons in the visual cortex.
+The weights of the \emph{first} convolutional layer are the only weights that can be visualised directly as images: they are small ($3\times3$ to $11\times11$) tensors with 3 channels (RGB), so they can be rendered as colour patches.
 
 \begin{insightbox}[Template matching interpretation]
-A convolutional filter $w$ applied to image $I$ produces a large activation at position $(r,c)$ when the patch of $I$ centered at $(r,c)$ is similar (high dot product) to the filter $w$ itself. Visualising the filter is equivalent to visualising the ``template'' the neuron responds maximally to.
+A convolutional filter $\mathbf{w}$ applied to image $I$ produces a large activation at position $(r,c)$ when the local patch of $I$ centred at $(r,c)$ has a high dot product with $\mathbf{w}$.  Since the dot product measures similarity, the filter is precisely the \emph{template} the neuron responds most strongly to.  Visualising the filter $=$ visualising the optimal stimulus for that neuron.
 \end{insightbox}
 
+\textbf{What do first-layer filters look like?}
+In AlexNet (trained on ImageNet), the 96 first-layer filters split naturally into two groups:
+\begin{itemize}
+  \item \textbf{Oriented edge detectors} (Gabor-like): respond to edges at a specific orientation and spatial frequency, analogous to \emph{simple cells} in primary visual cortex (V1).
+  \item \textbf{Colour blob detectors}: respond to patches of a specific colour (e.g.\ red-green or blue-yellow opponent channels), analogous to \emph{colour-selective} V1 neurons.
+\end{itemize}
+This parallel with neuroscience is not coincidental: both CNNs and the visual cortex are optimising for efficient coding of natural image statistics.
+
+\begin{warnbox}[Why only the first layer?]
+For layer $\ell > 1$, filters operate on the \emph{feature maps} of the previous layer — abstract volumes with many channels that are not RGB images.  Rendering such filters as images is meaningless.  Different methods (maximally activating patches, gradient ascent) are needed for deeper layers.
+\end{warnbox}
+
+%------------------------------------------------------------
 \subsubsection{Maximally Activating Patches}
+%------------------------------------------------------------
 
-For deeper layers, direct filter visualisation is not meaningful (filters operate on high-dimensional abstract volumes). Instead:
+The idea is simple: rather than looking at the filter weights directly, we ask \emph{``which real images produce the largest response at a given neuron?''} and then display the corresponding \emph{input patch} (the region of the input image that falls within the neuron's receptive field).
+
+\begin{algobox}{Algorithm: Maximally Activating Patches}
 \begin{enumerate}
-  \item Select a specific neuron in a deep layer.
-  \item Feed all training images through the network, recording activations.
-  \item Identify images with the highest activation.
-  \item Display the patch of the input image corresponding to the neuron's receptive field.
+  \item Choose a target neuron at position $(r_0, c_0)$ in layer $\ell$.
+  \item Forward-pass the entire dataset (or a large subset) through the network.
+  \item Record the activation of the target neuron for every image.
+  \item Sort images in descending order of activation.
+  \item For each top-$k$ image, crop the input region corresponding to the neuron's receptive field and display it.
 \end{enumerate}
-\textit{Result:} early layers respond to fine low-level patterns; intermediate layers respond to textures and parts; deep layers respond to high-level semantic content (faces, wheels, text).
+\end{algobox}
 
+\textbf{What the hierarchy looks like in practice} (from Zeiler \& Fergus, ECCV 2014):
+\begin{center}
+\renewcommand{\arraystretch}{1.25}
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{Layer} & \textbf{Receptive field size} & \textbf{What neurons respond to} \\
+\midrule
+Layer 1 & Very small ($\sim11\times11$) & Oriented edges, colour gradients \\
+Layer 2 & Moderate & Corners, junctions, simple textures \\
+Layer 3 & Larger & Textures, repeated patterns (grids, fur) \\
+Layer 4 & Even larger & Object parts (dog faces, wheels, text) \\
+Layer 5 & Large & Entire objects, semantic categories \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{insightbox}[The hierarchy is real, not assumed]
+The layered structure in a CNN is an \emph{architectural prior} — but the learned hierarchy of low-to-high-level features emerges from data alone.  Maximally activating patch visualisations provide direct empirical evidence that the network actually uses this hierarchy rather than collapsing it.
+\end{insightbox}
+
+\textbf{Limitation of the method.} Maximally activating patches are restricted to real images in the dataset.  The neuron may respond strongly to many different patterns that happen to co-occur in the top-$k$ images, making it hard to isolate the single feature the neuron is truly detecting.  Gradient ascent (below) overcomes this.
+
+%------------------------------------------------------------
 \subsubsection{Gradient Ascent: Synthesising Maximally Activating Inputs}
+%------------------------------------------------------------
+
+Instead of searching over real images, gradient ascent \emph{synthesises} an image from scratch by backpropagating not to the weights but to the \textbf{input pixels}. This gives the purest possible description of a neuron's preferred stimulus.
+
+\textbf{Setup.} Fix the network weights $\boldsymbol{\theta}$ (no weight update).  Let $S_c(\mathbf{I})$ be the score (pre-softmax logit) for class $c$, or the activation of any chosen neuron, viewed as a function of the input image $\mathbf{I}$.  We want to find the image that maximises this score.
 
 \begin{defbox}{Gradient Ascent for Neuron Visualisation}
-To find the input $\hat{I}$ that maximally activates a target neuron (or class score $S_c$):
 \[
-\hat{I} = \arg\max_{I}\; S_c(I) + \lambda \|I\|_2^2
+\hat{\mathbf{I}} = \arg\max_{\mathbf{I}}\; S_c(\mathbf{I}) - \lambda \|\mathbf{I}\|_2^2
 \]
-Starting from a random or zero image, iteratively update $I$ in the direction of $\nabla_I S_c(I)$ (gradient ascent). The regulariser $\lambda\|I\|_2^2$ encourages smooth, natural-looking images.
+The optimisation is performed by \textbf{gradient ascent} on the pixel values:
+\[
+\mathbf{I}^{(t+1)} = \mathbf{I}^{(t)} + \alpha \,\nabla_{\mathbf{I}} S_c\!\left(\mathbf{I}^{(t)}\right)
+\]
+starting from $\mathbf{I}^{(0)} = \mathbf{0}$ (or small random noise).  The gradient $\nabla_{\mathbf{I}} S_c$ is computed via backpropagation through the \emph{fixed} network.  The regulariser $\lambda\|\mathbf{I}\|_2^2$ penalises images with large pixel values, biasing the solution towards low-energy, visually interpretable patterns.
 \end{defbox}
 
-\begin{insightbox}[Hierarchical feature learning]
-Gradient ascent visualisations confirm the hierarchy: neurons in early layers synthesise oriented gratings and colour patches; neurons in intermediate layers synthesise textures; neurons in deep layers synthesise object-like patterns. This is visual evidence that CNNs genuinely learn a hierarchy of translation-invariant spatial pattern detectors.
+\begin{warnbox}[Sign of the regulariser — common exam trap]
+The $\ell_2$ term is \textbf{subtracted} in the objective (i.e.\ it acts as a penalty on large pixel magnitudes).  Writing it with a $+$ sign is wrong: that would \emph{reward} large pixel values and produce degenerate white images.  Always read the objective as ``maximise score, penalise pixel energy.''
+\end{warnbox}
+
+\textbf{What gradient ascent produces.}
+\begin{itemize}
+  \item \textbf{Early-layer neurons}: the synthesised images are simple oriented gratings or colour patches — consistent with Gabor filters.
+  \item \textbf{Intermediate-layer neurons}: the images show repeated textural patterns (fur-like, grid-like, scaly), but no coherent global structure.
+  \item \textbf{Deep-layer / class neurons}: the images start to resemble recognisable objects (eyes, beaks, wheels), though they often look psychedelic due to the absence of natural image constraints.
+\end{itemize}
+
+\begin{insightbox}[Hierarchical feature learning — confirmed]
+Gradient ascent visualisations confirm the hierarchy end-to-end: what a deep CNN computes is a hierarchy of template matchers, each layer detecting increasingly abstract and translation-invariant patterns.  The fact that class-level neurons synthesise object-like images (without ever being told what an object looks like) is strong evidence that the network has built an internal model of visual categories.
+\end{insightbox}
+
+\textbf{DeepDream (optional enrichment).} Google's DeepDream applies gradient ascent not to synthesise an image from scratch, but to \emph{amplify} the features a network already detects in a real photograph: the gradient of a layer's $\ell_2$-norm (rather than a single neuron) is used to update the image.  The result is the well-known hallucinatory imagery where the network exaggerates patterns it finds in the image (dog faces everywhere, spiralling textures).  DeepDream is a creative application of the same gradient-ascent idea, with no regulariser restricting the output to look natural.
+
+%------------------------------------------------------------
+\subsubsection{t-SNE Visualisation of Activations}
+%------------------------------------------------------------
+
+A complementary diagnostic is to visualise not individual neurons but the \emph{distribution of the entire representation space}.  One takes the activations of the penultimate layer (the feature vector just before the classifier) for a large set of images and projects them to 2D using \textbf{t-SNE} (t-distributed Stochastic Neighbour Embedding), a nonlinear dimensionality reduction method.
+
+\textbf{What t-SNE of CNN activations reveals.}
+\begin{itemize}
+  \item Images from the same semantic class cluster tightly together.
+  \item Visually similar classes (e.g.\ different dog breeds) form nearby clusters.
+  \item The 2D map often reveals a smooth semantic topology: cars near trucks, dogs near cats, far from buildings.
+\end{itemize}
+This contrasts sharply with t-SNE applied to \emph{raw pixels} (as seen in Section~\ref{sec:cnns}), where classes are hopelessly intermixed.  The CNN has transformed the pixel space into a semantically organised embedding space — which is precisely what makes the linear classifier on top work well.
+
+\begin{insightbox}[t-SNE as a sanity check]
+If t-SNE of CNN activations shows well-separated clusters, the network's representations are already ``almost linearly separable,'' and the final FC classifier just needs to draw hyperplanes.  Poor clustering in t-SNE is a red flag: it suggests the backbone is not learning discriminative features, and one should inspect the training data, loss, or architecture.
 \end{insightbox}
 
 %------------------------------------------------------------
-\subsection{Network in Network (NiN, 2014): GAP and 1\texttimes1 Convolutions}
+\subsubsection{Fooling Images and Adversarial Examples (Outlook)}
+%------------------------------------------------------------
+
+Gradient ascent can be pushed to a disturbing extreme.  Starting from a \emph{real} image of, say, a dog, one can iteratively perturb the pixels to maximise the score for a completely different class (e.g.\ ``ostrich''), subject to the perturbation being imperceptibly small in $\ell_\infty$ or $\ell_2$ norm.  The resulting image looks identical to the original dog photo to a human, yet the network predicts ``ostrich'' with 99\% confidence.
+
+These are called \term{adversarial examples} (Szegedy et al., 2013; Goodfellow et al., 2014).  Their existence reveals that CNN decision boundaries, while highly accurate on natural images, are thin and fragile in directions that are perceptually irrelevant.  This has important implications for robustness and security.  Defences (adversarial training, certified robustness) are an active research area and will appear again in the context of robustness.
+
+\begin{warnbox}[Fooling images vs.\ adversarial examples]
+\textbf{Fooling images} start from noise and are optimised to maximally activate a class — the result looks like noise but is classified with high confidence.  \textbf{Adversarial examples} start from a real, correctly classified image and add a small, imperceptible perturbation that flips the prediction.  Both exploit the same gradient-ascent mechanism, but adversarial examples are more practically dangerous because they are indistinguishable from legitimate inputs.
+\end{warnbox}
+
+%------------------------------------------------------------
+\subsubsection{Recap: CNN Visualisation}
+%------------------------------------------------------------
+
+\begin{tcolorbox}[colback=WarningRedBg,colframe=WarningRed,boxrule=0.8pt,arc=3pt]
+\textbf{CNN Visualisation — Summary (Exam Checklist)}
+\begin{enumerate}
+  \item \textbf{Why visualise?} Interpretability, debugging, Clever Hans detection, neuroscience validation.
+  \item \textbf{First-layer filter visualisation}: directly render $3$-channel filter weights as images; AlexNet filters = Gabor edge detectors + colour blobs; deeper filters cannot be visualised this way.
+  \item \textbf{Template matching}: a filter is the template the neuron responds maximally to (high dot product = high activation).
+  \item \textbf{Maximally activating patches}: forward-pass dataset, rank by neuron activation, display input patches of the top images; reveals the feature hierarchy: edges $\to$ textures $\to$ parts $\to$ objects.
+  \item \textbf{Gradient ascent}: fix weights, update \emph{pixels} via $\mathbf{I} \leftarrow \mathbf{I} + \alpha\,\nabla_\mathbf{I} S_c(\mathbf{I})$; objective $= S_c(\mathbf{I}) - \lambda\|\mathbf{I}\|_2^2$ (regulariser \textbf{subtracted}); synthesises the purest preferred stimulus; confirms the hierarchy.
+  \item \textbf{t-SNE of activations}: project penultimate-layer features to 2D; well-separated clusters = good representations; contrast with raw-pixel t-SNE (intermixed classes).
+  \item \textbf{Fooling images}: noise optimised to maximally activate a class; classified with high confidence; demonstrates that CNNs are not robust outside the natural image manifold.
+  \item \textbf{Adversarial examples}: real image + imperceptible perturbation $\Rightarrow$ wrong prediction with high confidence; same gradient-ascent mechanism; important security implication.
+\end{enumerate}
+\end{tcolorbox}
+
+%------------------------------------------------------------
+\subsection{Network in Network (NiN, 2014): $1\times1$ Convolutions and GAP}
 \label{sec:nin}
 %------------------------------------------------------------
 
-\term{Network in Network} (Lin, Chen, Yan, ICLR 2014) introduced two ideas that became foundational in modern architectures.
+\subsubsection{Motivation: Richer Local Representations}
 
-\subsubsection{MLPConv Layers}
+AlexNet and VGG use standard convolutional layers — each output feature at a spatial position is a single linear combination of the input patch, followed by a nonlinearity.  This is powerful, but a single linear filter can only detect one linear combination of the input channels per spatial position.
 
-Instead of a standard conv layer (linear combination + activation), NiN uses a \emph{small MLP} (1-2 hidden layers with ReLU) applied at each spatial position:
+\term{Network in Network} (Lin, Chen \& Yan, ICLR 2014) asked: \emph{what if we replaced that single linear filter with a small, local MLP?}  Rather than scanning one template over the image, scan an entire nonlinear function.  This increases representational power at \emph{no extra spatial cost} — the MLP is applied identically at every position, keeping the parameter count manageable.
+
+NiN introduced two ideas that proved to be enormously influential — far more so than NiN itself: \textbf{MLPConv layers} (which are equivalent to $1\times1$ convolutions) and \textbf{Global Average Pooling (GAP)}.  Both were adopted by GoogLeNet, ResNet, MobileNet, and virtually every modern architecture.
+
+%------------------------------------------------------------
+\subsubsection{MLPConv Layers and the Equivalence to $1\times1$ Convolutions}
+%------------------------------------------------------------
+
+\textbf{Standard convolutional layer.}  At each spatial position $(r,c)$, a filter $\mathbf{w} \in \mathbb{R}^{k\times k \times C_\text{in}}$ computes a single output feature:
 \[
-\text{Conv:} \quad f = \mathrm{ReLU}\!\left(\sum_i w_i x_i + b\right), \qquad
-\text{MLPConv:} \quad f = \mathrm{ReLU}\!\left(\sum_i w_i^{(1)}\mathrm{ReLU}\!\left(\sum_j w_j^{(2)} x_j + b^{(2)}\right) + b^{(1)}\right)
+f(r,c) = \sigma\!\left(\sum_{u,v,d} w_{u,v,d}\cdot x(r{+}u,\, c{+}v,\, d) + b\right)
 \]
-This is equivalent to $1\times1$ convolutions (see below), applied in a sliding fashion. It provides a richer functional approximation than a single linear layer.
+where $\sigma$ is a nonlinearity (e.g.\ ReLU) and $(u,v)$ ranges over the $k\times k$ spatial neighbourhood.
 
-\subsubsection{$1\times1$ Convolutions as Bottlenecks}
+\textbf{MLPConv layer.}  NiN replaces the single linear filter with a small fully-connected MLP (with one or two hidden layers) applied to the \emph{same} local patch:
+\[
+\mathbf{h}^{(1)}(r,c) = \sigma\!\left(W^{(1)} \mathbf{x}_{r,c} + \mathbf{b}^{(1)}\right), \qquad
+f(r,c) = \sigma\!\left(W^{(2)} \mathbf{h}^{(1)}(r,c) + \mathbf{b}^{(2)}\right)
+\]
+where $\mathbf{x}_{r,c} \in \mathbb{R}^{k^2 C_\text{in}}$ is the vectorised local patch and $W^{(1)}, W^{(2)}$ are weight matrices shared across all positions.
 
-A \textbf{$1\times1$ convolutional layer} takes each spatial position $(r,c)$ independently and applies a learned linear combination across \emph{all channels}. It:
+\begin{insightbox}[MLPConv $=$ Conv + $1\times1$ Conv]
+The MLPConv operation is mathematically equivalent to a standard $k\times k$ convolution followed by one or more \textbf{$1\times1$ convolutions}.  Here is why:
 \begin{itemize}
-  \item Does not affect spatial dimensions.
-  \item Can \emph{reduce or increase} the number of channels (depth).
-  \item Introduces nonlinearity (via activation after the $1\times1$ conv).
-  \item Is computationally very cheap compared to $3\times3$ or $5\times5$ convolutions.
+  \item The first layer of the MLP linearly combines the $k\times k$ patch into $C_1$ features — this is exactly a $k\times k$ conv producing $C_1$ channels.
+  \item Each subsequent MLP layer applies a linear transformation \emph{independently at each spatial position} to the current channel vector — this is exactly a $1\times1$ conv (spatial extent 1, mixing only channels).
 \end{itemize}
-Used as a \term{bottleneck}: inserting a $1\times1$ conv \emph{before} an expensive $3\times3$ or $5\times5$ conv reduces the number of input channels and dramatically cuts computation.
+So the name ``Network in Network'' is slightly misleading — the ``network'' inside is just extra $1\times1$ convolutions.  The key insight is that $1\times1$ convolutions are cheap, parameter-efficient, and add nonlinearity across channels.
+\end{insightbox}
 
+%------------------------------------------------------------
+\subsubsection{$1\times1$ Convolutions: Channel Mixing and Bottlenecks}
+%------------------------------------------------------------
+
+A $1\times1$ convolutional layer is so important it deserves its own treatment.
+
+\begin{defbox}{$1\times1$ Convolution}
+A $1\times1$ conv with $C_\text{out}$ filters takes an input volume of shape $H\times W\times C_\text{in}$ and produces an output volume of shape $H\times W\times C_\text{out}$ by applying a learned linear combination \emph{across all $C_\text{in}$ channels independently at each spatial position}:
+\[
+\text{out}(r,c,k) = \sigma\!\left(\sum_{d=1}^{C_\text{in}} w_{k,d}\cdot\text{in}(r,c,d) + b_k\right), \quad k=1,\ldots,C_\text{out}
+\]
+Total parameters: $C_\text{in}\times C_\text{out} + C_\text{out}$ (weights + biases).
+\end{defbox}
+
+\textbf{What does it do?}
+\begin{itemize}
+  \item \textbf{Channel mixing}: learns new linear combinations of the existing channels; can discover cross-channel correlations.
+  \item \textbf{Dimensionality reduction} ($C_\text{out} < C_\text{in}$): compresses the channel dimension cheaply.
+  \item \textbf{Dimensionality expansion} ($C_\text{out} > C_\text{in}$): creates more channels for subsequent layers.
+  \item \textbf{Introduces nonlinearity}: when followed by ReLU, adds a nonlinear transformation between channels at zero spatial cost.
+  \item \textbf{Does NOT mix spatial information}: each position $(r,c)$ is processed independently — spatial structure is preserved.
+\end{itemize}
+
+\textbf{Concrete parameter count example.}  Suppose we want to apply a $5\times5$ conv to a $28\times28\times192$ feature map, producing 32 output channels:
+\begin{itemize}
+  \item Direct $5\times5$ conv: $5\times5\times192\times32 = 153{,}600$ parameters.
+  \item $1\times1$ conv first ($192\to16$ channels): $192\times16 = 3{,}072$ parameters.\\
+    Then $5\times5$ conv ($16\to32$): $5\times5\times16\times32 = 12{,}800$ parameters.\\
+    Total: $15{,}872$ parameters — \textbf{10$\times$ fewer}.
+\end{itemize}
+This is the \term{bottleneck} pattern: use a $1\times1$ conv to reduce channels before an expensive spatial conv, then optionally expand again.
+
+\begin{tcolorbox}[colback=LightBlue,colframe=AccentBlue,boxrule=0.8pt,arc=3pt]
+\textbf{Uses of $1\times1$ convolutions in modern architectures}
+\begin{center}
+\renewcommand{\arraystretch}{1.25}
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{Architecture} & \textbf{Role of $1\times1$ conv} & \textbf{Effect} \\
+\midrule
+NiN & MLPConv hidden layers & Richer local representation \\
+GoogLeNet & Bottleneck before $3\times3$/$5\times5$ & Reduces computation by $\sim10\times$ \\
+ResNet (bottleneck) & Compress $\to$ conv $\to$ expand & Deeper nets with same compute \\
+MobileNet & Pointwise conv after depthwise & Channel mixing after spatial conv \\
+\bottomrule
+\end{tabular}
+\end{center}
+\end{tcolorbox}
+
+%------------------------------------------------------------
 \subsubsection{Global Average Pooling (GAP)}
+%------------------------------------------------------------
+
+The second NiN innovation is to replace the \emph{fully connected classifier head} with Global Average Pooling followed by a softmax.
+
+\textbf{The problem with FC layers at the end of a CNN.}  In AlexNet and VGG, the last convolutional block produces a volume (e.g.\ $7\times7\times512$).  This is flattened to a vector of $7\times7\times512 = 25{,}088$ values and fed into FC layers with thousands of neurons.  The FC layers:
+\begin{itemize}
+  \item Contain the \emph{vast majority of parameters} (VGG's 3 FC layers hold 102M of its 138M parameters).
+  \item Are \emph{position-sensitive}: the $k$-th weight connects to a specific spatial position; shifting the object by one pixel changes which weights activate.
+  \item Fix the \emph{input resolution}: the FC layer expects exactly $7\times7\times512$ inputs, locking the network to one image size.
+  \item Are prone to \emph{overfitting} (hence the heavy use of Dropout in AlexNet/VGG).
+\end{itemize}
 
 \begin{defbox}{Global Average Pooling (GAP)}
-Given a volume of shape $H \times W \times C$, GAP collapses the spatial dimensions by averaging each channel:
+Given a final feature volume of shape $H\times W\times C$, GAP produces one scalar per channel by averaging over the entire spatial extent:
 \[
-F_k = \frac{1}{H\cdot W}\sum_{(x,y)} f_k(x,y), \quad k=1,\ldots,C
+F_k = \frac{1}{H\cdot W}\sum_{r=1}^{H}\sum_{c=1}^{W} f_k(r,c), \quad k=1,\ldots,C
 \]
-Output shape: $C$ (a vector, one scalar per channel). This replaces flattening + dense layers at the end of the network.
+Output: a vector $\mathbf{F} \in \mathbb{R}^C$, fed directly into a softmax (or a single small FC layer).
+
+\textbf{Parameter count of the classifier head:}
+\begin{itemize}
+  \item FC after flatten: $H\cdot W\cdot C \times N_\text{classes}$ parameters (e.g.\ $25{,}088\times1000 \approx 25\text{M}$).
+  \item GAP + softmax: $C \times N_\text{classes}$ parameters (e.g.\ $512\times1000 \approx 0.5\text{M}$).
+\end{itemize}
 \end{defbox}
 
 \begin{tcolorbox}[colback=LightBlue,colframe=AccentBlue,boxrule=0.8pt,arc=3pt]
-\textbf{Advantages of GAP over FC after flattening:}
+\textbf{Advantages of GAP over FC + flatten}
 \begin{itemize}
-  \item \textbf{No trainable parameters} — cannot overfit; acts as structural regulariser.
-  \item \textbf{Size-agnostic inputs:} the network can classify images of \emph{any resolution} (the spatial sum adapts).
-  \item \textbf{Shift invariance:} spatial shifts in the input produce shifted feature maps but the \emph{same average} → GAP is inherently shift-invariant. FC after flattening is not (different neurons see different spatial positions).
-  \item \textbf{Interpretability:} enables Class Activation Mapping (CAM) for weakly-supervised localisation.
+  \item \textbf{Drastically fewer parameters}: no spatial-to-class weight matrix; essentially zero overfitting risk in the head.
+  \item \textbf{Resolution-agnostic}: any input size produces the same $C$-dimensional vector after GAP — the network can handle variable-resolution inputs at test time.
+  \item \textbf{Shift invariance}: a spatially shifted object shifts the feature map, but the \emph{average} is unchanged (or nearly so) $\Rightarrow$ GAP is a structural shift-invariance mechanism.  FC after flatten is not: each neuron is tied to a specific position.
+  \item \textbf{Structural regularisation}: GAP forces the network to distribute evidence globally across the spatial map rather than relying on positional shortcuts.
+  \item \textbf{Enables CAM}: because GAP feeds directly into the final FC layer, the weights of that layer can be used to produce Class Activation Maps (see Section~\ref{sec:lecture10}).
 \end{itemize}
 \end{tcolorbox}
 
-\begin{lstlisting}[caption={GAP layer in Keras}]
+\begin{insightbox}[Why GAP works: the ``one concept per channel'' inductive bias]
+When the architecture uses GAP + single FC, the network is implicitly pressured to make each channel $f_k$ correspond to a coherent, spatially distributed concept — because the only way to influence class $c$'s score is through the average $F_k = \frac{1}{HW}\sum f_k$.  This is why CAM works: the spatial map $f_k(r,c)$ literally shows \emph{where} the concept of channel $k$ appears in the image, and the FC weight $w_k^c$ says how much concept $k$ contributes to class $c$.  This interpretability is a \emph{direct consequence} of GAP — not of any special training procedure.
+\end{insightbox}
+
+\begin{lstlisting}[caption={GAP + softmax classifier head in Keras (NiN style)}]
+# x: output of last convolutional block, shape (batch, H, W, C)
 gap = tf.keras.layers.GlobalAveragePooling2D(name='gap')(x)
-# Output shape: (batch_size, num_channels)
-# Followed directly by Dense(num_classes, activation='softmax')
+# gap shape: (batch, C)
+out = tf.keras.layers.Dense(num_classes, activation='softmax')(gap)
+# Total head parameters: C * num_classes  (vs H*W*C * num_classes for FC)
 \end{lstlisting}
 
-\begin{insightbox}[GAP increases invariance to spatial shifts: a key exam point]
-An MLP after flattening connects \emph{specific spatial positions} to output neurons — if an object is shifted, completely different neurons fire. GAP aggregates over all positions, so a shifted object produces the same (or very similar) average feature vector. This makes GAP-based networks much more robust to spatial misalignment, which is common in real-world images.
-\end{insightbox}
+\begin{warnbox}[GAP vs.\ Global Max Pooling]
+\textbf{Global Max Pooling} (GMP) takes the maximum over the spatial map rather than the average.  GAP is preferred for classification because it considers the \emph{aggregate} evidence across the whole image, not just the single most-activated location.  For CAM, GAP is required: the CAM formula $M_c(x,y) = \sum_k w_k^c f_k(x,y)$ relies on the linearity of the average.  GMP breaks this linearity.
+\end{warnbox}
+
+%------------------------------------------------------------
+\subsubsection{The NiN Architecture}
+%------------------------------------------------------------
+
+For completeness, NiN stacks three \emph{mlpconv blocks} (each = $k\times k$ conv + two $1\times1$ convs + ReLU), with max-pooling between blocks to downsample, and ends with a fourth mlpconv block whose number of filters equals the number of classes, followed by GAP and softmax.  There are \textbf{no FC layers}.
+
+NiN did not achieve state-of-the-art ImageNet accuracy (partly because its training was less refined than AlexNet's), but its two ideas — $1\times1$ convolutions and GAP — were immediately adopted by GoogLeNet and have remained standard ever since.
+
+%------------------------------------------------------------
+\subsubsection{Recap: NiN, $1\times1$ Convolutions, and GAP}
+%------------------------------------------------------------
+
+\begin{tcolorbox}[colback=WarningRedBg,colframe=WarningRed,boxrule=0.8pt,arc=3pt]
+\textbf{NiN — Summary (Exam Checklist)}
+\begin{enumerate}
+  \item \textbf{Motivation}: standard conv = single linear filter at each position; NiN replaces it with a small MLP (``richer local representation'').
+  \item \textbf{MLPConv = Conv + $1\times1$ convs}: the first layer is a standard $k\times k$ conv; subsequent MLP layers are $1\times1$ convolutions applied channel-wise.
+  \item \textbf{$1\times1$ conv}: mixes channels, reduces or expands depth, adds nonlinearity, does \emph{not} mix spatial information.  Parameters: $C_\text{in}\times C_\text{out}$.
+  \item \textbf{Bottleneck pattern}: $1\times1$ conv (reduce) $\to$ expensive spatial conv $\to$ $1\times1$ conv (expand); reduces parameters by $\sim10\times$.
+  \item \textbf{GAP}: averages each channel over all spatial positions; output shape $= C$ (not $H\cdot W\cdot C$).
+  \item \textbf{GAP advantages over FC}: far fewer parameters; resolution-agnostic; shift-invariant; enables CAM.
+  \item \textbf{GAP vs.\ GMP}: GAP = average (aggregate evidence, linear $\Rightarrow$ CAM works); GMP = max (single peak, nonlinear $\Rightarrow$ CAM does not apply).
+  \item \textbf{Exam trap}: GAP has \emph{zero} learnable parameters; the only parameters in the head are in the final FC/softmax layer of size $C\times N_\text{classes}$.
+\end{enumerate}
+\end{tcolorbox}
 
 %------------------------------------------------------------
 \subsection{GoogLeNet / Inception v1 (2014): Multi-Scale Branches}
 \label{sec:inception}
 %------------------------------------------------------------
 
-VGG achieved better accuracy than AlexNet but at the cost of \emph{more} parameters (138M vs.\ 60M).
-\term{GoogLeNet} (Szegedy et al., CVPR 2015) attacked the opposite question: \emph{can we achieve
-better accuracy with dramatically \emph{fewer} parameters?}  The answer was yes — 5M parameters,
-$12\times$ fewer than AlexNet — by rethinking how to combine spatial and channel information.
+VGG showed that depth matters, but paid for it with 138M parameters — almost all of them in the
+FC layers at the top.  \term{GoogLeNet} (Szegedy et al., CVPR 2015) asked the complementary
+question: \emph{can we be deeper \textbf{and} use fewer parameters?}  The answer was yes: 22
+layers, only \textbf{5M parameters} ($12\times$ fewer than AlexNet), and a top-5 error of 6.7\%
+on ImageNet — better than VGG.  The key innovation is the \term{Inception module}.
 
-\subsubsection{Motivation: Features at Multiple Scales}
+%------------------------------------------------------------
+\subsubsection{Motivation: Multi-Scale Feature Extraction}
+%------------------------------------------------------------
 
-Objects in natural images appear at widely varying scales: a dog may fill the frame, or be a small
-patch in the background.  A fixed filter size (say $3\times3$) may be too small for large objects
-or too large for fine-grained details.  The \emph{naive} solution — use a larger filter — quickly
-becomes computationally prohibitive on deep feature maps with hundreds of channels.  GoogLeNet's
-solution: run multiple filter sizes \emph{in parallel} and let the network learn which scale is
-most informative at each layer.
+Objects in natural images appear at widely varying scales: a face may fill the entire frame or
+occupy a tiny corner.  Standard CNNs fix one filter size per layer and stack depth to grow the
+receptive field — but this means early layers use the same small filter regardless of whether the
+relevant structure is fine-grained (a texture) or coarse (an object outline).
 
-\subsubsection{Inception Module}
+\textbf{Naive idea:} use multiple filter sizes at the same layer by running $1\times1$,
+$3\times3$, and $5\times5$ convolutions \emph{in parallel} on the same input, then concatenate
+the results.  The network can then learn which scale is most informative at each layer.
 
-\begin{defbox}{Inception Module (v1)}
-At each Inception block, four parallel branches operate on the \emph{same} input volume and their
-outputs are \textbf{concatenated along the channel axis}:
-\begin{enumerate}
-  \item \textbf{$1\times1$ conv} — captures fine-grained, point-wise cross-channel patterns.
-  \item \textbf{$1\times1$ bottleneck $\to$ $3\times3$ conv} — medium-scale spatial features at
-    reduced channel cost.
-  \item \textbf{$1\times1$ bottleneck $\to$ $5\times5$ conv} — large-scale spatial features at
-    reduced channel cost.
-  \item \textbf{$3\times3$ max-pool $\to$ $1\times1$ conv} — pooled spatial summary with channel
-    compression.
-\end{enumerate}
-All branches use \texttt{padding='same'} to preserve spatial dimensions.  Outputs of all four
-branches are concatenated: $\text{output} = \mathrm{concat}([b_1, b_2, b_3, b_4],\;\text{axis=channel})$.
+\textbf{The problem:} on a deep feature map with $C$ channels, $5\times5$ convolutions are
+very expensive.  Consider a $28\times28\times192$ feature map with a $5\times5$ conv producing
+32 filters:
+\[
+\text{FLOPs} = 5^2 \times 192 \times 32 \times 28^2 \approx 120\,\text{M multiply-adds per image.}
+\]
+Stacking nine such modules, with larger channel counts, is computationally infeasible.
 
-\textbf{What the inception module changes and what it does not:}
+\textbf{The solution (Inception module):} insert $1\times1$ convolutions as \emph{bottlenecks}
+to reduce the channel dimension \emph{before} each expensive spatial convolution.  This is the
+key architectural insight of GoogLeNet.
+
+%------------------------------------------------------------
+\subsubsection{The Naive Inception Module (Conceptual Starting Point)}
+%------------------------------------------------------------
+
+The conceptual design of the Inception module is to take a single input volume and apply three
+sizes of spatial filter in parallel, alongside a pooling branch, then concatenate all results:
+
+\begin{center}
+\renewcommand{\arraystretch}{1.3}
+\begin{tabular}{@{}clll@{}}
+\toprule
+\textbf{Branch} & \textbf{Operation} & \textbf{Input shape} & \textbf{Output shape} \\
+\midrule
+1 & $1\times1$ conv, $N_1$ filters  & $H\times W\times C$ & $H\times W\times N_1$ \\
+2 & $3\times3$ conv, $N_2$ filters  & $H\times W\times C$ & $H\times W\times N_2$ \\
+3 & $5\times5$ conv, $N_3$ filters  & $H\times W\times C$ & $H\times W\times N_3$ \\
+4 & $3\times3$ max-pool             & $H\times W\times C$ & $H\times W\times C$   \\
+\midrule
+  & \textbf{Concatenate (axis = channel)} & & $H\times W\times(N_1+N_2+N_3+C)$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{insightbox}[Why concatenation requires \texttt{padding='same'} and stride 1]
+All four branches must produce feature maps of \emph{identical spatial dimensions} $H\times W$
+so that they can be stacked along the channel axis.  This requires:
 \begin{itemize}
-  \item \textbf{Spatial size $H \times W$}: \textbf{unchanged}. Every branch uses \texttt{padding='same'} and stride 1, so all four branch outputs have the same $H \times W$ as the input. This is a requirement for concatenation. The module does \emph{not} reduce spatial dimensions.
-  \item \textbf{Channel depth}: \textbf{grows}. The output has more channels than the input (sum of all branch output channels), giving a richer representation.
-  \item \textbf{Receptive field}: grows normally through subsequent layers as in any conv stack. The inception module does \emph{not} use skip connections and does \emph{not} have any special receptive field mechanism.
+  \item \textbf{All convolutions}: \texttt{padding='same'} and \texttt{stride=1} so output
+    spatial size equals input spatial size, regardless of filter size.
+  \item \textbf{Max-pooling}: \texttt{padding='same'} and \texttt{stride=1} (this is unusual —
+    in a standard CNN, pooling reduces spatial size; here it must not).
 \end{itemize}
+The channel dimension is the \emph{only} dimension that changes across branches.  The final
+output has more channels than any single branch but the same $H\times W$ as the input.
+\end{insightbox}
+
+This naive design is computationally impractical.  For a $28\times28\times192$ input and
+$N_1{=}64, N_2{=}128, N_3{=}32$ output channels:
+
+\begin{center}
+\renewcommand{\arraystretch}{1.25}
+\begin{tabular}{@{}lccc@{}}
+\toprule
+\textbf{Branch} & \textbf{Filter size} & \textbf{Parameters} & \textbf{MAdds} \\
+\midrule
+$1\times1$ & $1^2\times192\times64$   & 12{,}288   & $\sim$12M \\
+$3\times3$ & $3^2\times192\times128$  & 221{,}184  & $\sim$173M \\
+$5\times5$ & $5^2\times192\times32$   & 153{,}600  & $\sim$120M \\
+Max-pool   & (no parameters)          & 0          & —         \\
+\midrule
+\textbf{Total} & & \textbf{387{,}072} & $\boldsymbol{\sim}$\textbf{305M} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The $3\times3$ and $5\times5$ branches dominate the cost.  Nine stacked modules would be
+untrainable on 2014-era hardware.
+
+%------------------------------------------------------------
+\subsubsection{The Inception Module with Bottlenecks (Actual GoogLeNet Design)}
+%------------------------------------------------------------
+
+The fix is to insert a \textbf{$1\times1$ bottleneck conv} before each expensive spatial conv,
+reducing the channel dimension first.  The max-pool branch also gets a $1\times1$ conv
+\emph{after} pooling to compress the channels it passes through (since pooling preserves all
+$C$ channels, which is expensive for subsequent layers).
+
+The resulting four-branch structure is:
+
+\begin{defbox}{Inception Module with Dimensionality Reduction (v1)}
+Input: $H\times W\times C$ feature map.  All ops use \texttt{padding='same'}, \texttt{stride=1}.
+
+\medskip
+\begin{tabularx}{\linewidth}{@{}c>{\raggedright\arraybackslash}Xc@{}}
+\toprule
+\textbf{Br.} & \textbf{Operations (in order)} & \textbf{Output channels} \\
+\midrule
+1 & $1\times1$ conv ($N_1$ filters) & $N_1$ \\
+2 & $1\times1$ conv ($r_2$ ch) $\to$ $3\times3$ conv ($N_2$ ch),\newline
+    intermediate: $r_2 \ll C$ & $N_2$ \\
+3 & $1\times1$ conv ($r_3$ ch) $\to$ $5\times5$ conv ($N_3$ ch),\newline
+    intermediate: $r_3 \ll C$ & $N_3$ \\
+4 & $3\times3$ max-pool $\to$ $1\times1$ conv ($N_4$ ch) & $N_4$ \\
+\midrule
+\multicolumn{2}{@{}l}{\textbf{Concatenate all branches along channel axis}} &
+  $N_1{+}N_2{+}N_3{+}N_4$ \\
+\bottomrule
+\end{tabularx}
+
+\medskip
+Spatial size $H\times W$ is \textbf{unchanged} by the module.
+The $1\times1$ bottleneck reductions $r_2, r_3 \ll C$ are the key to efficiency.
 \end{defbox}
 
-\textbf{Why the $1\times1$ bottlenecks are indispensable.}  On a feature map with 480 channels,
-a $5\times5$ conv with 128 output channels costs
-$5^2 \times 480 \times 128 \approx 154\text{M}$ operations.
-Inserting a $1\times1$ conv that first reduces from 480 to 16 channels cuts this to
-$(1^2 \times 480 \times 16) + (5^2 \times 16 \times 128) \approx 58\text{M}$ operations — a $\sim$\textbf{2.7$\times$ reduction} at that branch alone.
-Across the whole module the saving is even larger: from 854M to 358M total operations.
+\textbf{How much does the bottleneck save?}  Using the same $28\times28\times192$ input with
+$r_2{=}96, r_3{=}16, N_1{=}64, N_2{=}128, N_3{=}32, N_4{=}32$:
 
-\begin{insightbox}[Exam trap: operations vs.\ parameters, and the ``naive'' vs.\ ``bottleneck'' variant]
-The $1\times1$ bottleneck reduces \emph{both} operations and parameters, but through the same mechanism — reducing $C_\text{in}$ before the expensive conv:
+\begin{center}
+\renewcommand{\arraystretch}{1.35}
+\begin{tabularx}{\linewidth}{@{}l>{\centering\arraybackslash}X>{\centering\arraybackslash}X>{\centering\arraybackslash}Xc@{}}
+\toprule
+\textbf{Branch} & \textbf{Ops} & \textbf{Params (naive)} & \textbf{Params (bottleneck)} & \textbf{Saving} \\
+\midrule
+Br.\ 1 ($1\times1$)
+  & —
+  & 12{,}288
+  & 12{,}288
+  & $1\times$ \\
+Br.\ 2 ($3\times3$)
+  & $1\times1$+$3\times3$
+  & 221{,}184
+  & $192{\cdot}96 + 9{\cdot}96{\cdot}128$\newline$= 129{,}024$
+  & $1.7\times$ \\
+Br.\ 3 ($5\times5$)
+  & $1\times1$+$5\times5$
+  & 153{,}600
+  & $192{\cdot}16 + 25{\cdot}16{\cdot}32$\newline$= 15{,}872$
+  & $\mathbf{9.7\times}$ \\
+Br.\ 4 (pool)
+  & $1\times1$ after
+  & 0
+  & $192{\cdot}32 = 6{,}144$
+  & — \\
+\midrule
+\textbf{Total} & & \textbf{387{,}072} & \textbf{163{,}328} & $\boldsymbol{2.4\times}$ \\
+\bottomrule
+\end{tabularx}
+\end{center}
 
-\textbf{Operations} (FLOPs): a $5\times5$ conv costs $5^2 \cdot C_\text{in} \cdot N_F \cdot H \cdot W$ multiply-adds per layer. Reducing $C_\text{in}$ from 480 to 16 cuts this by 30$\times$ for that conv.
+The $5\times5$ branch benefits most — nearly a $10\times$ parameter reduction — because its
+filter is expensive and the $1\times1$ bottleneck squeezes from 192 down to just 16 channels
+before the spatial conv.
 
-\textbf{Parameters}: a $5\times5$ conv has $5^2 \cdot C_\text{in} \cdot N_F$ weights. Same reduction: from $5^2 \times 480 \times 128 = 1{,}536{,}000$ to $5^2 \times 16 \times 128 = 51{,}200$ filter weights (plus the $1\times1$ conv itself: $480 \times 16 = 7{,}680$).
-
-\textbf{Historical note — the ``variant'':} the original conceptual inception module (as first sketched) ran $1\times1$, $3\times3$, and $5\times5$ convolutions \emph{directly on the full-channel input}, without any bottleneck. The $1\times1$ bottleneck convolutions were introduced as a \textbf{practical modification} to make the module computationally tractable. Exam questions sometimes frame this as ``in a variant of the inception block, $1\times1$ convolutions were introduced to reduce parameters'' — this is technically correct and refers to this historical refinement from the naive to the bottleneck version.
-\end{insightbox}
-
-\begin{lstlisting}[caption={Inception module in Keras (full 4-branch version)}]
-# x: input tensor of shape (N, H, W, C)
-# Branch 1: 1x1 conv
-b1 = tf.keras.layers.Conv2D(32,  kernel_size=1, padding='same', activation='relu')(x)
-
-# Branch 2: 1x1 bottleneck -> 3x3 conv
-b2 = tf.keras.layers.Conv2D(64,  kernel_size=1, padding='same', activation='relu')(x)
-b2 = tf.keras.layers.Conv2D(128, kernel_size=3, padding='same', activation='relu')(b2)
-
-# Branch 3: 1x1 bottleneck -> 5x5 conv
-b3 = tf.keras.layers.Conv2D(16,  kernel_size=1, padding='same', activation='relu')(x)
-b3 = tf.keras.layers.Conv2D(32,  kernel_size=5, padding='same', activation='relu')(b3)
-
-# Branch 4: 3x3 max-pool -> 1x1 conv
-b4 = tf.keras.layers.MaxPooling2D((3,3), strides=(1,1), padding='same')(x)
-b4 = tf.keras.layers.Conv2D(32,  kernel_size=1, padding='same', activation='relu')(b4)
-
-# Concatenate along channel axis (axis=-1 in Keras's NHWC convention)
-y = tf.keras.layers.Concatenate(axis=-1)([b1, b2, b3, b4])
-\end{lstlisting}
-
-\begin{warnbox}[PyTorch convention for concatenation]
-In PyTorch, tensors are \texttt{(N,C,H,W)}, so channel concatenation is \texttt{torch.cat([b1,b2,b3,b4], dim=1)}.
-In Keras, tensors are \texttt{(N,H,W,C)}, so it is \texttt{Concatenate(axis=-1)}.
-Also note: because the Inception module has parallel branches that \emph{merge}, it cannot be
-expressed with \texttt{nn.Sequential} in PyTorch — you must write the branches explicitly in
-\texttt{forward()}.
+\begin{warnbox}[Naive vs.\ bottleneck — a classic exam question]
+Exam questions often present the Inception module in its \textbf{naive form} (no $1\times1$
+bottlenecks) and ask you to explain what the bottleneck variant changes and why.  Key points:
+\begin{itemize}
+  \item The naive module applies $3\times3$ and $5\times5$ convolutions directly on the full
+    $C$-channel input — this is expensive.
+  \item The bottleneck variant inserts $1\times1$ convolutions \emph{before} these spatial
+    convolutions to reduce $C$ to $r \ll C$ first, then applies the spatial conv on the
+    compressed volume.
+  \item The $1\times1$ bottleneck reduces \textbf{both} parameters ($\propto C_\text{in}$) and
+    FLOPs ($\propto C_\text{in}$) by the same factor $C/r$.
+  \item The max-pool branch gets a $1\times1$ conv \emph{after} (not before) the pool, because
+    the pool itself has no parameters — the $1\times1$ is there to limit the channels passed
+    forward, not to reduce cost of the pool.
+\end{itemize}
 \end{warnbox}
 
-\begin{insightbox}[3 take-home messages from GoogLeNet]
-\begin{enumerate}
-  \item \textbf{Parallel branches at multiple scales:} process the same input with $1\times1$,
-    $3\times3$, and $5\times5$ filters simultaneously; concatenate results.  This lets the
-    network adaptively weight which scale is most informative.
-  \item \textbf{$1\times1$ convolutions as cheap bottlenecks:} reduce channel depth before
-    expensive spatial convolutions, cutting operations by 2--8$\times$ per branch.
-  \item \textbf{Auxiliary classification losses:} inject gradient signal into early layers to
-    fight vanishing gradients (see below).
-\end{enumerate}
+\textbf{Role of each branch — why these four?}
+\begin{itemize}
+  \item \textbf{Branch 1 ($1\times1$ conv):} pure channel mixing at the current position —
+    cheapest possible operation.  Captures cross-channel correlations with zero spatial context.
+    Acts as the ``skip'' of the module: it sees the full input without any spatial aggregation.
+  \item \textbf{Branch 2 ($3\times3$ conv):} captures fine-to-medium spatial features (e.g.\
+    edges, small textures).  The $3\times3$ filter is the workhorse of most modern CNNs.
+  \item \textbf{Branch 3 ($5\times5$ conv):} captures larger-scale spatial features (e.g.\
+    object parts, coarse shapes) in a single step.  More expensive but extends the effective
+    context window.
+  \item \textbf{Branch 4 (max-pool $\to$ $1\times1$):} provides a \emph{pooled} summary of the
+    local neighbourhood.  Max-pooling is a scale- and translation-invariant summary; the
+    $1\times1$ conv then selects which pooled channels to propagate forward.  This branch ensures
+    the module always has access to a spatially-robust summary, not just convolved features.
+\end{itemize}
+The network learns \emph{how much} to rely on each branch via the filter weights — there is no
+manual scale selection.
+
+\begin{lstlisting}[caption={Inception module in Keras (bottleneck version)}]
+# x: input tensor shape (N, H, W, C)
+
+# Branch 1: 1x1 conv only
+b1 = Conv2D(64,  kernel_size=1, padding='same', activation='relu')(x)
+
+# Branch 2: 1x1 bottleneck (96 ch) -> 3x3 conv (128 ch)
+b2 = Conv2D(96,  kernel_size=1, padding='same', activation='relu')(x)
+b2 = Conv2D(128, kernel_size=3, padding='same', activation='relu')(b2)
+
+# Branch 3: 1x1 bottleneck (16 ch) -> 5x5 conv (32 ch)
+b3 = Conv2D(16,  kernel_size=1, padding='same', activation='relu')(x)
+b3 = Conv2D(32,  kernel_size=5, padding='same', activation='relu')(b3)
+
+# Branch 4: 3x3 max-pool (stride=1!) -> 1x1 conv (32 ch)
+b4 = MaxPooling2D((3,3), strides=(1,1), padding='same')(x)
+b4 = Conv2D(32,  kernel_size=1, padding='same', activation='relu')(b4)
+
+# Concatenate along channel axis: output shape (N, H, W, 64+128+32+32=256)
+y = Concatenate(axis=-1)([b1, b2, b3, b4])
+\end{lstlisting}
+
+\begin{warnbox}[PyTorch vs.\ Keras tensor conventions]
+In \textbf{Keras}, tensors are \texttt{(N,H,W,C)}: concatenate on \texttt{axis=-1} (last axis =
+channels).  In \textbf{PyTorch}, tensors are \texttt{(N,C,H,W)}: concatenate on \texttt{dim=1}.
+Also: the Inception module has parallel branches that \emph{merge}, so it cannot be expressed
+with \texttt{nn.Sequential} — you must code the branches explicitly in \texttt{forward()}.
+\end{warnbox}
+
+%------------------------------------------------------------
+\subsubsection{GoogLeNet Architecture Details}
+%------------------------------------------------------------
+
+GoogLeNet stacks 9 Inception modules (with occasional $2\times2$ max-pool layers between groups
+to halve the spatial dimensions), preceded by two initial conv+pool blocks for early
+spatial down-sampling.  Key statistics:
+
+\begin{center}
+\renewcommand{\arraystretch}{1.25}
+\begin{tabular}{@{}lrr@{}}
+\toprule
+\textbf{Model} & \textbf{Parameters} & \textbf{Top-5 error (ImageNet)} \\
+\midrule
+AlexNet   & 60M  & 15.3\% \\
+VGG-16    & 138M & 7.3\%  \\
+GoogLeNet & 5M   & 6.7\%  \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+GoogLeNet uses \textbf{no FC layers} — a GAP layer (see Section~\ref{sec:nin}) feeds directly
+into a softmax classifier, saving roughly 50M parameters compared to VGG's three FC layers.
+
+\textbf{Auxiliary classifiers.}
+At 22 layers, GoogLeNet is deep enough for gradients from the final loss to be severely
+attenuated by the time they reach the early Inception modules — the vanishing gradient problem.
+The solution is to attach two \term{auxiliary classification heads} to intermediate feature maps
+(after the 3rd and 6th Inception modules).
+
+Each auxiliary head is a small sub-network: $5\times5$ average pool $\to$ $1\times1$ conv $\to$
+FC(1024) $\to$ FC($N_\text{classes}$) $\to$ softmax.  Their losses enter the total training
+objective with weight 0.3:
+\[
+  \mathcal{L}_{\text{total}}
+  = \mathcal{L}_{\text{main}}
+  + 0.3\,\mathcal{L}_{\text{aux1}}
+  + 0.3\,\mathcal{L}_{\text{aux2}}.
+\]
+
+\begin{insightbox}[How auxiliary classifiers fight vanishing gradients]
+The chain rule tells us that the gradient of the loss with respect to a parameter in layer $\ell$
+is a product of Jacobians from layer $\ell$ all the way to the output.  In a 22-layer network
+this product can become exponentially small.  An auxiliary head attached at layer $k$
+provides a \emph{short circuit}: it introduces a direct loss term whose gradient only needs to
+backpropagate through layers $1, \ldots, k$, not all the way to 22.  This is an early
+precursor to ResNet's skip connections, which solve the same problem architecturally rather
+than through loss engineering.
+
+The auxiliary heads are \textbf{discarded at inference} — they are a training device only.
 \end{insightbox}
 
-\subsubsection{GoogLeNet Architecture Details}
+%------------------------------------------------------------
+\subsubsection{Recap: GoogLeNet and the Inception Module}
+%------------------------------------------------------------
 
-GoogLeNet stacks \textbf{27 layers} total (including pooling), structured as:
+\begin{tcolorbox}[colback=WarningRedBg,colframe=WarningRed,boxrule=0.8pt,arc=3pt]
+\textbf{GoogLeNet / Inception v1 — Summary (Exam Checklist)}
 \begin{enumerate}
-  \item Two initial blocks of conv + pooling (traditional processing to reduce spatial resolution
-    before the expensive inception modules begin).
-  \item \textbf{Nine Inception modules} stacked sequentially.
-  \item \textbf{No fully-connected layers}: a GAP layer feeds directly into a linear classifier
-    + softmax.  This alone saves $\sim$50M parameters compared to VGG's FC layers.
+  \item \textbf{Core idea}: process the same input with $1\times1$, $3\times3$, $5\times5$
+    convolutions and $3\times3$ max-pool \emph{in parallel}; concatenate along the channel axis.
+  \item \textbf{Concatenation requires same spatial size}: all branches use
+    \texttt{padding='same'}, \texttt{stride=1} — output is $H\times W\times(N_1+N_2+N_3+N_4)$.
+  \item \textbf{Naive module}: no bottlenecks; $3\times3$ and $5\times5$ branches operate on full
+    $C$-channel input — computationally prohibitive.
+  \item \textbf{Bottleneck module}: $1\times1$ conv \emph{before} each spatial conv reduces
+    $C \to r \ll C$; saves parameters \emph{and} FLOPs by the same factor $C/r$.
+  \item \textbf{Max-pool branch}: $1\times1$ conv \emph{after} the pool (not before) to compress
+    the $C$ channels the pool passes through.
+  \item \textbf{Role of each branch}: $1\times1$ = channel mixing; $3\times3$ = fine spatial;
+    $5\times5$ = coarse spatial; max-pool = spatially robust pooled summary.
+  \item \textbf{No FC layers}: GAP + softmax; 5M total parameters vs.\ 138M for VGG.
+  \item \textbf{Auxiliary classifiers}: two auxiliary heads (weight 0.3) injecting gradient into
+    early layers during training; discarded at inference; precursor to residual connections.
+  \item \textbf{Exam trap}: the $1\times1$ bottleneck reduces both parameters and operations —
+    not just one of them.  The $5\times5$ branch benefits most from the bottleneck.
 \end{enumerate}
-Total trainable parameters: \textbf{only 5M} — 12$\times$ fewer than AlexNet (60M) despite being
-deeper and more accurate.
-
-\textbf{Auxiliary classifiers.}  GoogLeNet also faces vanishing gradients: at 22 layers deep,
-gradient signals from the final loss are attenuated before reaching early layers.  The solution:
-attach two \textbf{auxiliary classification heads} to intermediate feature maps (after the 3rd
-and 6th Inception modules).  Each auxiliary head consists of an average-pool layer, a $1\times1$
-conv, two FC layers, and a softmax classifier.  Their losses are added to the main loss, weighted
-at 0.3 each:
-\[
-  \mathcal{L}_{\text{total}} = \mathcal{L}_{\text{main}} + 0.3\,\mathcal{L}_{\text{aux1}}
-                                                          + 0.3\,\mathcal{L}_{\text{aux2}}.
-\]
-The auxiliary heads are \emph{only active during training} and discarded at inference.  The
-motivation: intermediate representations should already contain meaningful class information —
-asking them to classify forces the network to maintain useful features throughout, not just at
-the very end.
+\end{tcolorbox}
 
 %------------------------------------------------------------
 \subsection{ResNet (2015): Residual Learning}
 \label{sec:resnet}
 %------------------------------------------------------------
 
-GoogLeNet showed that clever architecture design (parallel branches, $1\times1$ bottlenecks) could
-achieve more with fewer parameters.  But both AlexNet, VGG, and GoogLeNet faced a common ceiling:
-making networks \emph{much} deeper consistently hurt performance.  \term{ResNet} (He et al., CVPR
-2016) asked why, diagnosed the cause as an \emph{optimisation} problem rather than an
-\emph{expressiveness} problem, and introduced a fix so simple it seems obvious in hindsight:
-add a direct path from input to output around every block of layers.
+GoogLeNet showed that clever architecture design could achieve more with fewer parameters.
+But a fundamental ceiling remained: making networks \emph{much} deeper consistently
+\emph{hurt} performance, even on the training set.  \term{ResNet} (He et al., CVPR 2016)
+diagnosed the root cause and introduced a fix so structurally simple — a single addition
+— that it seems obvious in hindsight.  The result: a 152-layer network that surpassed human
+performance on ImageNet, and an architecture that became the backbone of virtually every
+modern vision system.
 
+%------------------------------------------------------------
 \subsubsection{The Degradation Problem}
+%------------------------------------------------------------
 
-Empirically, adding more layers to a plain (no skip connections) network beyond a certain depth
-\emph{increases both training and test error}.  This is \textbf{not} overfitting — overfitting
-would decrease training error while increasing test error.  It is an \textbf{optimisation failure}:
-deeper networks are simply harder to train.
+Training plain (no skip connections) CNNs deeper than about 20--30 layers produces a
+paradoxical result: \textbf{both training error and test error increase}.
 
-\begin{insightbox}[Why deeper should not be worse]
-Theoretically, a 56-layer network should be able to match a 20-layer network: just copy the
-shallow network's weights into the first 20 layers and set all extra layers to identity mappings.
-The empirical failure to do this reveals that \emph{learning the identity function is surprisingly
-hard for standard conv layers}.  If a layer's input is already a good representation, the layer
-needs to output exactly what came in — but gradient descent on a stack of conv layers with random
-initialisation has no particular reason to converge to the identity.  Residual connections solve
-this by making the identity the \emph{default} (zero-cost) path.
+\begin{warnbox}[This is not overfitting]
+Overfitting means training error decreases while test error increases — the network memorises
+the training set but fails to generalise.  The degradation problem is different: the \emph{training}
+error itself is higher for the 56-layer network than for the 20-layer network.  The deeper model
+is simply worse at optimisation, not at generalisation.
+\end{warnbox}
+
+\textbf{Why should a deeper network not be worse, in theory?}
+A 56-layer network strictly contains the 20-layer network as a special case: copy the
+shallow network's solution into the first 20 layers and set every additional layer to the
+\emph{identity mapping} (output = input).  The 56-layer network could, in principle, do at
+least as well.
+
+The empirical failure to do this reveals a fundamental difficulty: \textbf{learning the identity
+function is surprisingly hard for a stack of conv layers with random initialisation}.  A conv
+layer initialized near zero computes something close to zero — not something close to the
+identity.  For the layer to act as an identity it must learn a specific non-trivial set of
+weights.  This is the bottleneck that residual connections are designed to eliminate.
+
+%------------------------------------------------------------
+\subsubsection{The Residual Reparametrisation — Core Idea}
+%------------------------------------------------------------
+
+\textbf{The key insight is a change of variables.}  Suppose a block of layers should ideally
+compute some function $\mathcal{H}(\mathbf{x})$.  In a plain network the conv layers must
+directly learn $\mathcal{H}$.  ResNet instead reparametrises the problem: define the
+\term{residual}
+\[
+  \mathcal{F}(\mathbf{x}) \;\coloneqq\; \mathcal{H}(\mathbf{x}) - \mathbf{x},
+\]
+and let the conv layers learn $\mathcal{F}$ instead of $\mathcal{H}$.  The original mapping
+is then reconstructed by adding back the input:
+\[
+  \mathcal{H}(\mathbf{x}) = \mathcal{F}(\mathbf{x}) + \mathbf{x}.
+\]
+This addition is implemented by a \term{skip connection} (also called a shortcut connection)
+— a direct wire from the block's input to its output that bypasses the conv layers entirely.
+The two signals are combined by \textbf{element-wise addition}: no learnable parameters, no
+nonlinearity on the skip path.
+
+\begin{insightbox}[Why this reparametrisation makes optimisation easier]
+Consider two extremes:
+\begin{itemize}
+  \item \textbf{Best case: the block should do nothing.}
+    Target: $\mathcal{H}(\mathbf{x}) = \mathbf{x}$.
+    In a plain network: the conv layers must learn weights such that their output equals
+    their input — a non-trivial constraint.
+    With a skip connection: the conv layers must learn $\mathcal{F}(\mathbf{x}) = \mathbf{0}$,
+    i.e.\ drive all their weights to zero.  This is trivially achieved by any initialisation
+    scheme that starts near zero and any regulariser that penalises large weights.
+    \textbf{The identity is now the default path, achieved for free.}
+  \item \textbf{Normal case: the block should refine the representation.}
+    The conv layers only need to learn the \emph{correction} $\mathcal{F}(\mathbf{x})$
+    relative to the input — a typically small delta.  Empirically, trained ResNets show
+    that most residuals are small in magnitude, confirming that each block makes only a
+    minor adjustment to its input.
+\end{itemize}
 \end{insightbox}
 
-\subsubsection{Residual Block}
+%------------------------------------------------------------
+\subsubsection{Worked Example: Forward and Backward Pass}
+%------------------------------------------------------------
 
-The central idea: instead of asking a block to learn a mapping $\mathcal{H}(\mathbf{x})$ from
-scratch, rewrite the target as:
+To make the mechanics completely concrete, consider a toy single-channel, single-pixel
+residual block with two weight layers (the spatial convolution structure is the same; we
+use scalars for clarity).
+
+\textbf{Setup.} Input $x = 1.0$.  Two weight layers with scalar weights $w_1 = 0.5$,
+$w_2 = 0.4$ and no biases or activations (to keep the algebra clean).  The skip connection
+adds $x$ back after the two layers.
+
+\textbf{Forward pass.}
+\begin{align*}
+  h_1 &= w_1 \cdot x = 0.5 \times 1.0 = 0.5 & \text{(output of first layer)}\\
+  h_2 &= w_2 \cdot h_1 = 0.4 \times 0.5 = 0.2 & \text{(output of second layer)} \\
+  \mathcal{F}(x) &= h_2 = 0.2 & \text{(residual)}\\
+  \text{output} &= \mathcal{F}(x) + x = 0.2 + 1.0 = \mathbf{1.2} & \text{(skip adds input back)}
+\end{align*}
+
+\textbf{Compare with a plain block} (no skip connection):
 \[
-  \mathcal{H}(\mathbf{x}) = \underbrace{\mathcal{F}(\mathbf{x})}_{\text{learned by conv layers}}
-                            + \underbrace{\mathbf{x}}_{\text{identity shortcut}},
+  \text{output}_\text{plain} = h_2 = 0.2.
 \]
-where $\mathcal{F}(\mathbf{x}) \coloneqq \mathcal{H}(\mathbf{x}) - \mathbf{x}$ is the
-\term{residual} — only the \emph{correction} to the input is learned, not the full mapping.
-The skip connection adds $\mathbf{x}$ to the output of the conv layers via an element-wise addition,
-\emph{without any learnable parameters on the skip path}.
+The skip connection keeps the output close to the input ($1.2$ vs.\ $1.0$), while the plain
+block's output ($0.2$) has drifted far from the input — information is being destroyed.
 
-\textbf{Why this is easier to optimise.}  If the block should ideally do nothing
-($\mathcal{H}(\mathbf{x}) = \mathbf{x}$), the conv layers only need to learn
-$\mathcal{F}(\mathbf{x}) = \mathbf{0}$ — drive all weights toward zero.  Pushing weights toward
-zero via gradient descent is far easier than learning an arbitrary identity mapping.  In practice,
-trained ResNets show that most blocks learn \emph{small} residuals, suggesting each block makes
-only a minor refinement to the representation.
+\textbf{Backward pass — gradient highway.}
+Suppose the loss gradient arriving at the block output is $\frac{\partial L}{\partial \text{output}} = \delta$.
 
-\begin{defbox}{Residual Block}
-A basic residual block (used in ResNet-18/34) consists of two $3\times3$ conv layers with a skip
-connection:
+\emph{With skip connection:}
 \[
-  \text{output} = \sigma\!\bigl(\mathcal{F}(\mathbf{x}) + \mathbf{x}\bigr),
+  \frac{\partial L}{\partial x}
+  = \frac{\partial L}{\partial \text{output}} \cdot
+    \frac{\partial\,(\mathcal{F}(x) + x)}{\partial x}
+  = \delta \cdot \left(\frac{\partial \mathcal{F}}{\partial x} + 1\right)
+  = \delta \cdot (w_1 w_2 + 1)
+  = \delta \cdot (0.5 \times 0.4 + 1)
+  = \delta \cdot 1.2.
 \]
-where:
-\begin{itemize}
-  \item $\mathcal{F}(\mathbf{x}) = W_2\,\sigma(W_1 \mathbf{x})$ is the output of the two conv
-    layers (BN and ReLU between them; \emph{no} final activation before the addition).
-  \item $\mathbf{x}$ is the \term{identity shortcut} — added element-wise with no weights.
-  \item $\sigma$ is ReLU, applied \emph{after} the addition.
-\end{itemize}
+
+\emph{Without skip connection:}
+\[
+  \frac{\partial L}{\partial x}
+  = \delta \cdot w_1 w_2
+  = \delta \cdot 0.2.
+\]
+
+\begin{tcolorbox}[colback=LightBlue,colframe=AccentBlue,boxrule=0.8pt,arc=3pt]
+\textbf{The gradient highway:} the skip connection adds the constant $+1$ to the gradient
+multiplier at every block.  In a deep network with $L$ residual blocks, the gradient flowing
+back to the first layer contains a sum of path contributions rather than a product of small
+numbers.  Even if $\frac{\partial \mathcal{F}}{\partial x}$ is tiny, the gradient does not
+vanish — it travels along the skip connections at full strength.
+
+Formally, the gradient through a stack of $L$ residual blocks satisfies:
+\[
+  \frac{\partial L}{\partial \mathbf{x}_0}
+  = \frac{\partial L}{\partial \mathbf{x}_L}
+    \cdot \prod_{\ell=1}^{L}\!\left(1 + \frac{\partial \mathcal{F}_\ell}{\partial \mathbf{x}_{\ell-1}}\right).
+\]
+Even if every $\frac{\partial \mathcal{F}_\ell}{\partial \mathbf{x}_{\ell-1}} \approx 0$,
+the product of $(1 + 0)^L = 1$ — gradient flows without attenuation.
+Compare with a plain network: $\prod_\ell \frac{\partial f_\ell}{\partial \mathbf{x}_{\ell-1}}$,
+which vanishes exponentially if each factor is $< 1$.
+\end{tcolorbox}
+
+%------------------------------------------------------------
+\subsubsection{The Basic Residual Block (ResNet-18/34)}
+%------------------------------------------------------------
+
+\begin{defbox}{Basic Residual Block}
+Two $3\times3$ conv layers with Batch Normalisation, plus an identity skip connection:
+\[
+  \mathbf{y} = \sigma\!\bigl(\mathcal{F}(\mathbf{x}) + \mathbf{x}\bigr),
+  \qquad
+  \mathcal{F}(\mathbf{x}) = \mathrm{BN}(W_2\,\sigma(\mathrm{BN}(W_1\,\mathbf{x}))).
+\]
+
+\textbf{Order of operations} (critical for implementation):
+\begin{enumerate}
+  \item Conv$_1$ ($3\times3$, same padding, stride 1, no bias)
+  \item BatchNorm$_1$
+  \item ReLU
+  \item Conv$_2$ ($3\times3$, same padding, stride 1, no bias)
+  \item BatchNorm$_2$
+  \item \textbf{Add} $\mathbf{x}$ (skip connection) — \emph{before} the final activation
+  \item ReLU (applied \emph{after} the addition)
+\end{enumerate}
+
 \textbf{Shape constraint.}  Element-wise addition requires $\mathcal{F}(\mathbf{x})$ and
-$\mathbf{x}$ to have \emph{identical} shape (height, width, channels).  When a block changes
-spatial resolution or channel count (e.g.\ at stage boundaries), a \term{projection shortcut}
-— a $1\times1$ conv with stride $s$ — is applied to $\mathbf{x}$ to match dimensions:
-\[
-  \text{output} = \sigma\!\bigl(\mathcal{F}(\mathbf{x}) + W_s\,\mathbf{x}\bigr),
-  \quad W_s \in \mathbb{R}^{C_{\text{out}} \times C_{\text{in}} \times 1 \times 1}.
-\]
+$\mathbf{x}$ to have \emph{identical} shape $(H, W, C)$.  Both conv layers use
+\texttt{padding='same'} and \texttt{stride=1}, so spatial size is preserved.  Channel count
+must also match.
 \end{defbox}
 
-\textbf{BatchNorm in ResNet.}  Every conv layer in ResNet is followed by
-\term{Batch Normalisation} before the activation.  This is essential: without BN, training
-networks of 50+ layers with residual connections still diverges.  BN stabilises the distribution
-of activations entering each layer, keeps gradients well-conditioned, and effectively acts as
-a strong regulariser — allowing ResNet to be trained without dropout.
+\textbf{What happens when spatial size or channel count changes?}
+At stage boundaries (e.g.\ transitioning from $56\times56\times64$ to $28\times28\times128$),
+the skip path must be adjusted to match the new shape.  This is done with a
+\term{projection shortcut}: a $1\times1$ conv with the appropriate stride and output channels,
+applied only to $\mathbf{x}$ on the skip path:
+\[
+  \mathbf{y} = \sigma\!\bigl(\mathcal{F}(\mathbf{x}) + W_s\,\mathbf{x}\bigr),
+  \qquad W_s \in \mathbb{R}^{C_\text{out} \times C_\text{in} \times 1 \times 1},\;\text{stride }s.
+\]
+The projection shortcut \emph{does} have learnable parameters ($C_\text{in} \times C_\text{out}$
+weights), unlike the identity shortcut which has zero parameters.
 
-\begin{lstlisting}[caption={Residual block in Keras (same spatial size, same channels)}]
-# Input x; filters = number of filters; name = block identifier
-s1 = tf.keras.layers.Conv2D(filters, 3, padding='same', use_bias=False,
-                             name='conv_'+name+'_1')(x)
-s1 = tf.keras.layers.BatchNormalization(name='bn_'+name+'_1')(s1)
-s1 = tf.keras.layers.ReLU()(s1)
-s2 = tf.keras.layers.Conv2D(filters, 3, padding='same', use_bias=False,
-                             activation=None, name='conv_'+name+'_2')(s1)
-s2 = tf.keras.layers.BatchNormalization(name='bn_'+name+'_2')(s2)
-# Skip connection: add input directly (same spatial size & channels)
-s3 = tf.keras.layers.Add(name='add_'+name)([x, s2])
-s4 = tf.keras.layers.ReLU(name='relu_'+name)(s3)
-# Spatial downsampling happens OUTSIDE the residual block
-s5 = tf.keras.layers.MaxPooling2D(name='pool_'+name)(s4)
-\end{lstlisting}
-
-\begin{warnbox}[ResNet implementation details]
-\begin{itemize}
-  \item Conv layers inside a residual block: \texttt{padding='same'}, \texttt{stride=1},
-    \texttt{use\_bias=False} (bias is redundant when followed by BN).
-    Downsampling (stride 2) goes \emph{outside} the block.
-  \item ReLU is applied \emph{after} the addition $\mathcal{F}(\mathbf{x}) + \mathbf{x}$,
-    not between the two conv layers and the shortcut.
-  \item If channel counts differ between skip path and $\mathcal{F}(\mathbf{x})$, use a
-    $1\times1$ conv (projection shortcut) on the skip path to match dimensions before addition.
-\end{itemize}
+\begin{warnbox}[The two most common implementation errors]
+\begin{enumerate}
+  \item \textbf{ReLU before the addition.}  Some students apply ReLU after Conv$_2$ and
+    \emph{then} add the skip.  This is wrong — it prevents negative residuals from being
+    expressed (since ReLU clips to zero).  The correct order: BN $\to$ add $\to$ ReLU.
+  \item \textbf{Downsampling inside the block.}  Setting \texttt{stride=2} on Conv$_1$
+    inside the residual block while using an unstrided skip connection will cause a shape
+    mismatch at the addition.  Downsampling must either go on \emph{both} paths
+    (via a strided projection shortcut on the skip) or be handled outside the block entirely.
+\end{enumerate}
 \end{warnbox}
 
-\subsubsection{Bottleneck Residual Block}
+\begin{lstlisting}[caption={Basic residual block in Keras}]
+# x: input tensor; filters: number of channels (must match input channels)
+shortcut = x  # identity skip path
 
-For very deep networks (ResNet-50/101/152), a \term{bottleneck block} reduces computation:
+s = Conv2D(filters, 3, padding='same', use_bias=False)(x)
+s = BatchNormalization()(s)
+s = ReLU()(s)
+s = Conv2D(filters, 3, padding='same', use_bias=False)(s)
+s = BatchNormalization()(s)          # BN before addition, no ReLU yet
+
+out = Add()([shortcut, s])          # skip connection: add BEFORE ReLU
+out = ReLU()(out)                   # final activation AFTER addition
+\end{lstlisting}
+
+%------------------------------------------------------------
+\subsubsection{Bottleneck Residual Block (ResNet-50/101/152)}
+%------------------------------------------------------------
+
+For deeper variants, each residual block uses a \term{bottleneck} design to reduce computation
+while keeping representational power:
+
+\begin{defbox}{Bottleneck Residual Block}
+Three conv layers instead of two: $1\times1$ (reduce) $\to$ $3\times3$ (spatial) $\to$
+$1\times1$ (restore):
 \begin{enumerate}
-  \item $1\times1$ conv: reduces channels (e.g.\ 256 $\to$ 64).
-  \item $3\times3$ conv: spatial processing (on the reduced channels).
-  \item $1\times1$ conv: restores channels (64 $\to$ 256).
+  \item $1\times1$ conv: $C \to C/4$ channels (reduces depth by $4\times$)
+  \item $3\times3$ conv: $C/4 \to C/4$ channels (spatial processing on compressed volume)
+  \item $1\times1$ conv: $C/4 \to C$ channels (restores original depth)
 \end{enumerate}
-This achieves the same representational power with $\sim3\times$ fewer operations than two $3\times3$ convs on the full channel count.
+Skip connection adds the original $\mathbf{x}$ (shape $H\times W\times C$) to the output of
+step 3 (also $H\times W\times C$) — same element-wise addition as the basic block.
+\end{defbox}
 
-\subsubsection{ResNet Architecture}
+\textbf{Parameter comparison} for a block operating on 256-channel features:
+\begin{center}
+\renewcommand{\arraystretch}{1.25}
+\begin{tabular}{@{}lcc@{}}
+\toprule
+\textbf{Block type} & \textbf{Operations} & \textbf{Parameters} \\
+\midrule
+Basic ($2\times3\times3$)     & $2 \times 3^2 \times 256^2$ & 1{,}179{,}648 \\
+Bottleneck ($1{+}3{+}1$)      & $256{\cdot}64 + 3^2{\cdot}64^2 + 64{\cdot}256$ & 69{,}632 \\
+\midrule
+Saving & & $\mathbf{17\times}$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+The bottleneck block is \emph{much} cheaper, enabling ResNet-50/101/152 to go deeper without
+exploding compute.
 
-ResNet uses:
-\begin{itemize}
-  \item One initial conv + batch-norm + ReLU + max-pool layer.
-  \item 4 stages of residual blocks, each stage doubling channels and halving spatial size (via strided conv on the first block of each stage).
-  \item Global Average Pooling instead of FC layers.
-  \item Final softmax classifier.
-\end{itemize}
+\textbf{BatchNorm in ResNet.}  Every conv layer is followed by Batch Normalisation \emph{before}
+the activation.  BN is essential: it stabilises activation distributions across layers,
+keeps gradients well-conditioned, and removes the need for Dropout — ResNet is typically
+trained with no dropout at all.
 
-\begin{insightbox}[Why residual connections work — deeper insights]
-The identity shortcut enables gradients to flow directly from the loss back to early layers without passing through potentially saturated activations. It effectively creates an \emph{ensemble of shallower networks} implicit in the residual structure, each using a different subset of layers. Empirically, the learned residuals are small (the network is close to identity in most blocks), suggesting that most layers are fine-tuning the representation rather than transforming it drastically.
+%------------------------------------------------------------
+\subsubsection{ResNet Architecture and Scale}
+%------------------------------------------------------------
+
+\begin{center}
+\renewcommand{\arraystretch}{1.25}
+\begin{tabular}{@{}lcccc@{}}
+\toprule
+\textbf{Model} & \textbf{Layers} & \textbf{Block type} & \textbf{Params} & \textbf{Top-5 error} \\
+\midrule
+ResNet-18  & 18  & Basic       & 11M  & 10.9\% \\
+ResNet-34  & 34  & Basic       & 22M  & 9.0\%  \\
+ResNet-50  & 50  & Bottleneck  & 25M  & 7.0\%  \\
+ResNet-101 & 101 & Bottleneck  & 45M  & 6.2\%  \\
+ResNet-152 & 152 & Bottleneck  & 60M  & \textbf{5.7\%}  \\
+\midrule
+GoogLeNet  & 22  & Inception   & 5M   & 6.7\%  \\
+VGG-16     & 16  & Plain conv  & 138M & 7.3\%  \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+ResNet-152 achieved \textbf{3.57\% top-5 error} as an ensemble, surpassing the estimated human
+performance of $\sim$5\%.  It won ILSVRC 2015 by a large margin.  The key enabler was not
+a larger model (ResNet-152 has fewer parameters than VGG-16) but the ability to train
+an unprecedented 152 layers stably.
+
+\begin{insightbox}[ResNet as an implicit ensemble]
+An alternative interpretation of residual networks (Veit et al., 2016): unrolling the
+additions shows that a ResNet with $L$ blocks defines $2^L$ distinct paths from input to
+output (each block's residual can either be traversed or bypassed).  The network behaves
+like an \emph{implicit ensemble} of exponentially many shallow networks of varying depth.
+Most of the gradient signal flows through short paths (since the skip connections provide
+direct gradient highways), while the longer paths contribute fine-tuning.  This explains
+why ResNets remain robust even when individual layers are dropped at test time — a property
+called \term{stochastic depth}.
 \end{insightbox}
 
-\subsubsection{ResNet Scale and Results}
+%------------------------------------------------------------
+\subsubsection{Recap: ResNet and Residual Connections}
+%------------------------------------------------------------
 
-He et al.\ trained networks of unprecedented depth:
-\begin{itemize}
-  \item \textbf{ResNet-152} on ImageNet: 152 layers, \textbf{3.57\% top-5 error} — surpassing estimated human performance ($\sim$5\%). Won ILSVRC 2015 both classification and localisation tracks.
-  \item \textbf{ResNet-1202} on CIFAR-10: 1202 layers, demonstrating that residual training remains stable even at this extreme depth (though accuracy did not improve further beyond ResNet-110, suggesting optimisation is not the only bottleneck at that scale).
-\end{itemize}
-
-\subsubsection{ResNet Block in PyTorch}
-
-\begin{lstlisting}[language=Python, caption={Residual block in PyTorch}]
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-
-residual = x  # save input for skip connection
-
-# Both conv layers preserve spatial dimensions (padding=1, stride=1)
-s1 = nn.Conv2d(C, C, kernel_size=3, padding=1)(x)
-s1 = F.relu(s1)
-s2 = nn.Conv2d(C, C, kernel_size=3, padding=1)(s1)
-# NOTE: do NOT apply ReLU to s2 before the addition
-
-# Skip connection: element-wise addition
-s3 = torch.add(residual, s2)
-
-# Apply non-linearity AFTER the addition
-s4 = F.relu(s3)
-
-# Spatial downsampling happens OUTSIDE the residual block
-s5 = nn.MaxPool2d(kernel_size=2, stride=2)(s4)
-\end{lstlisting}
-
-\begin{warnbox}[PyTorch ResNet implementation details]
-\begin{itemize}
-  \item Spatial size must \textbf{not} change within a residual block: use \texttt{padding=1, stride=1} in both conv layers. Downsampling (stride 2 or MaxPool) goes \emph{outside} the block.
-  \item Apply ReLU \textbf{after} the \texttt{torch.add} — not between the two conv layers and the addition.
-  \item If the skip path and $\mathcal{F}(\mathbf{x})$ differ in channel count (e.g.\ after changing the number of filters), add a $1\times1$ conv on the skip path to match dimensions.
-\end{itemize}
-\end{warnbox}
+\begin{tcolorbox}[colback=WarningRedBg,colframe=WarningRed,boxrule=0.8pt,arc=3pt]
+\textbf{ResNet — Summary (Exam Checklist)}
+\begin{enumerate}
+  \item \textbf{Degradation problem}: deeper plain networks have \emph{higher training error}
+    — an optimisation failure, not overfitting.
+  \item \textbf{Root cause}: learning the identity function is hard for conv layers; they
+    start near zero output, not near the identity.
+  \item \textbf{Residual reparametrisation}: learn $\mathcal{F}(\mathbf{x}) = \mathcal{H}(\mathbf{x}) - \mathbf{x}$;
+    reconstruct $\mathcal{H}$ by adding back $\mathbf{x}$ via a skip connection.
+  \item \textbf{Identity as default}: if $\mathcal{F} \to \mathbf{0}$ (easy), the block acts
+    as identity — exactly what is needed for ``extra'' layers to be harmless.
+  \item \textbf{Gradient highway}: skip connection adds $+1$ to gradient multiplier per block;
+    gradients flow back through $L$ blocks as $(1 + \partial\mathcal{F}/\partial\mathbf{x})^L$
+    rather than a product that vanishes.
+  \item \textbf{Shape constraint}: skip + residual must have same shape.  Use
+    \textbf{identity shortcut} (no params) when shape is unchanged; use
+    \textbf{projection shortcut} ($1\times1$ conv, has params) when spatial size or channel
+    count changes.
+  \item \textbf{Order of ops in basic block}: Conv $\to$ BN $\to$ ReLU $\to$ Conv $\to$ BN
+    $\to$ \textbf{Add skip} $\to$ ReLU.  Never apply ReLU before the addition.
+  \item \textbf{Bottleneck block} ($1\times1\to3\times3\to1\times1$): $17\times$ fewer
+    parameters than two $3\times3$ convs on full channels; used in ResNet-50+.
+  \item \textbf{BatchNorm}: applied after every conv, before activation; essential for
+    stability; replaces the need for Dropout in ResNet.
+  \item \textbf{Exam trap}: the skip connection has \emph{zero} learnable parameters (identity
+    shortcut) — unless it is a projection shortcut, which has $C_\text{in}\times C_\text{out}$
+    parameters.
+\end{enumerate}
+\end{tcolorbox}
 
 %------------------------------------------------------------
 \subsection{MobileNet (2017): Efficient Inference}
